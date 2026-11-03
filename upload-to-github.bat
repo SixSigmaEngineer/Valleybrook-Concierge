@@ -46,8 +46,10 @@ echo   done.
 echo.
 
 REM ---------- 3. Set up the local repository (first run only) ----------
+set "FIRSTRUN="
 if not exist ".git" (
   echo First run: setting up Git in this folder...
+  set "FIRSTRUN=1"
   git init >nul
   git checkout -b %BRANCH% >nul 2>&1
 )
@@ -56,6 +58,25 @@ if errorlevel 1 (
   git remote add origin "%REPO_URL%"
 ) else (
   git remote set-url origin "%REPO_URL%"
+)
+
+REM First run in a folder that came from a zip or a copy: link it to the
+REM existing GitHub history without touching the files here, so the files
+REM in this folder become new changes on top of what's already on GitHub.
+if defined FIRSTRUN (
+  git ls-remote --exit-code --heads origin %BRANCH% >nul 2>&1
+  if not errorlevel 1 (
+    echo Linking this folder to the project on GitHub...
+    git fetch origin %BRANCH%
+    if errorlevel 1 (
+      echo *** Couldn't reach GitHub. Check your internet connection and try again. ***
+      rmdir /s /q ".git"
+      pause
+      exit /b 1
+    )
+    git reset origin/%BRANCH% >nul
+    git branch --set-upstream-to=origin/%BRANCH% %BRANCH% >nul 2>&1
+  )
 )
 
 REM ---------- 4. Make sure Git knows who you are ----------
@@ -89,7 +110,7 @@ echo.
 echo Getting your team's latest changes from GitHub...
 git ls-remote --exit-code --heads origin %BRANCH% >nul 2>&1
 if errorlevel 1 goto push
-git pull --rebase --allow-unrelated-histories origin %BRANCH%
+git pull --rebase origin %BRANCH%
 if errorlevel 1 (
   echo.
   echo *** Your changes conflict with a teammate's changes to the same file. ***
