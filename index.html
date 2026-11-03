@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Valleybrook Concierge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#041E42; --navy-2:#0B2B5A; --navy-3:#163C73; --ink:#0d1b2e;
+  --gold:#FFC72C; --gold-2:#FFD866; --paper:#F4F1EA; --line:#D9D3C4;
+  --text:#EAF0FA; --muted:#9FB2CF; --ok:#3CCB8B; --warn:#FF8A3D;
+  --radius:18px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;background:var(--navy);color:var(--text);font-family:Barlow,system-ui,Segoe UI,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;touch-action:manipulation}
+input,textarea,select{font:inherit;user-select:text;-webkit-user-select:text}
+
+.app{display:grid;grid-template-rows:auto minmax(0,1fr);grid-template-columns:minmax(0,1fr);height:100vh;width:100vw;overflow:hidden}
+header{display:flex;align-items:center;gap:18px;padding:14px 24px;background:linear-gradient(90deg,var(--navy) 0%,var(--navy-2) 100%);border-bottom:4px solid var(--gold)}
+.logo{width:52px;height:52px;border-radius:14px;background:var(--gold);display:grid;place-items:center;color:var(--navy);font:700 26px 'Barlow Condensed','Arial Narrow',sans-serif}
+.brand h1{margin:0;font:700 30px/1 'Barlow Condensed',sans-serif;letter-spacing:.5px}
+.brand p{margin:4px 0 0;color:var(--muted);font-size:15px}
+header .spacer{flex:1}
+.icon-btn{height:52px;min-width:52px;padding:0 16px;border-radius:14px;background:var(--navy-3);display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:600;font-size:16px}
+.icon-btn:active{transform:scale(.96)}
+.edit-flag{display:none;background:var(--warn);color:#1b0e00;padding:8px 14px;border-radius:999px;font-weight:700}
+body.editing .edit-flag{display:inline-block}
+
+main{display:grid;grid-template-columns:minmax(0,1fr) 440px;min-height:0;min-width:0}
+@media (max-width:1100px){main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) 46vh}}
+
+/* ---------- Map ---------- */
+.map-col{min-width:0;display:flex;flex-direction:column;min-height:0;padding:16px 18px 18px}
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.chip{padding:12px 18px;border-radius:999px;background:var(--navy-2);border:2px solid var(--navy-3);font-weight:600;font-size:16px}
+.chip.on{background:var(--gold);color:var(--navy);border-color:var(--gold)}
+.map-wrap{flex:1;min-height:0;display:grid;place-items:center;position:relative}
+.stage{position:relative;border-radius:var(--radius);overflow:visible;background:var(--paper);box-shadow:0 20px 50px rgba(0,0,0,.35)}
+.stage > .plan{position:absolute;inset:0;width:100%;height:100%;border-radius:var(--radius);object-fit:fill;pointer-events:none}
+.bubble{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:4px;z-index:2;touch-action:none}
+.bubble .dot{width:var(--bs,62px);height:var(--bs,62px);border-radius:50%;background:#fff;border:4px solid var(--navy);display:grid;place-items:center;font-size:calc(var(--bs,62px)*.48);box-shadow:0 6px 16px rgba(4,30,66,.35);transition:transform .15s}
+.bubble .lbl{background:var(--navy);color:#fff;font-weight:600;font-size:13px;padding:3px 9px;border-radius:999px;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.bubble:active .dot{transform:scale(.92)}
+.bubble.dim{opacity:.22}
+.bubble.hl .dot{border-color:var(--gold);animation:pulse 1.4s infinite;transform:scale(1.12)}
+.bubble.hl .lbl{background:var(--gold);color:var(--navy)}
+.bubble.hl{z-index:5}
+.stage.compact .bubble:not(.hl) .lbl{display:none}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,199,44,.85)}70%{box-shadow:0 0 0 26px rgba(255,199,44,0)}100%{box-shadow:0 0 0 0 rgba(255,199,44,0)}}
+body.editing .bubble .dot{border-style:dashed;cursor:grab}
+.map-hint{margin-left:auto;align-self:center;font-size:15px;color:var(--muted)}
+.youarehere{position:absolute;transform:translate(-50%,-50%);z-index:1;pointer-events:none}
+.youarehere span{display:block;background:#E5484D;color:#fff;font-weight:700;font-size:12px;padding:4px 8px;border-radius:8px;white-space:nowrap}
+
+/* ---------- Chat ---------- */
+.chat-col{min-width:0;display:flex;flex-direction:column;min-height:0;background:var(--navy-2);border-left:1px solid var(--navy-3)}
+.chat-head{padding:18px 20px 10px;display:flex;align-items:center;gap:12px}
+.avatar{width:46px;height:46px;border-radius:50%;background:radial-gradient(circle at 35% 30%,var(--gold-2),var(--gold) 60%,#d99f00);display:grid;place-items:center;font-size:22px;flex:none}
+.avatar.talking{animation:talk .5s infinite alternate}
+@keyframes talk{to{transform:scale(1.12)}}
+.chat-head h2{margin:0;font:700 22px 'Barlow Condensed','Arial Narrow',sans-serif}
+.chat-head small{color:var(--muted);font-size:14px}
+.msgs{flex:1;overflow-y:auto;padding:8px 18px 12px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch}
+.msg{max-width:88%;padding:12px 16px;border-radius:16px;font-size:17px;line-height:1.4;white-space:pre-wrap}
+.msg.bot{background:var(--navy-3);border-top-left-radius:4px;align-self:flex-start}
+.msg.user{background:var(--gold);color:var(--navy);border-top-right-radius:4px;align-self:flex-end;font-weight:500}
+.msg .links{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.msg .links button{background:rgba(255,199,44,.15);border:1px solid var(--gold);color:var(--gold-2);padding:6px 10px;border-radius:999px;font-size:14px;font-weight:600}
+.typing{opacity:.7;font-style:italic}
+.suggest{display:flex;gap:8px;overflow-x:auto;padding:4px 18px 10px;scrollbar-width:none}
+.suggest button{flex:none;background:transparent;border:2px solid var(--navy-3);padding:9px 14px;border-radius:999px;font-size:15px;color:var(--muted)}
+.composer{padding:12px 16px 18px;display:flex;gap:10px;align-items:center;border-top:1px solid var(--navy-3)}
+.composer input{flex:1;min-width:0;height:56px;border-radius:14px;border:2px solid var(--navy-3);background:var(--navy);color:var(--text);padding:0 16px;font-size:17px;outline:none}
+.composer input:focus{border-color:var(--gold)}
+.mic{width:84px;height:84px;border-radius:50%;background:var(--gold);color:var(--navy);display:grid;place-items:center;flex:none;box-shadow:0 8px 20px rgba(255,199,44,.3)}
+.mic svg{width:38px;height:38px}
+.mic.live{background:#E5484D;color:#fff;animation:pulse 1.2s infinite}
+.send{width:56px;height:56px;border-radius:14px;background:var(--navy-3);display:grid;place-items:center;flex:none}
+.voice-row{display:flex;justify-content:space-between;align-items:center;padding:0 20px 8px;color:var(--muted);font-size:14px}
+.toggle{display:inline-flex;align-items:center;gap:8px}
+.sw{width:46px;height:26px;border-radius:999px;background:var(--navy-3);position:relative;transition:.2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s}
+.sw.on{background:var(--ok)}.sw.on::after{left:23px}
+
+/* ---------- Sheets / modals ---------- */
+.scrim{position:fixed;inset:0;background:rgba(2,10,24,.6);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:50;padding:24px}
+.scrim.open{display:flex}
+.sheet{width:min(860px,100%);max-height:92vh;overflow:auto;background:#fff;color:var(--ink);border-radius:24px;box-shadow:0 30px 80px rgba(0,0,0,.5);animation:up .2s ease-out}
+@keyframes up{from{transform:translateY(24px);opacity:0}}
+.detail{display:grid;grid-template-columns:1.1fr 1fr}
+@media (max-width:800px){.detail{grid-template-columns:1fr}}
+.photo{min-height:340px;background:linear-gradient(135deg,var(--navy-2),var(--navy-3));display:grid;place-items:center;font-size:120px;border-radius:24px 0 0 24px;overflow:hidden;position:relative}
+.photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.photo .ph-note{position:absolute;bottom:12px;left:12px;font-size:13px;color:#fff;background:rgba(0,0,0,.45);padding:4px 10px;border-radius:999px}
+.dbody{padding:28px 28px 24px;display:flex;flex-direction:column;gap:14px}
+.dbody h3{margin:0;font:700 34px/1.05 'Barlow Condensed','Arial Narrow',sans-serif}
+.tagrow{display:flex;gap:8px;flex-wrap:wrap}
+.tag{background:#EEF2F8;color:var(--navy);padding:6px 12px;border-radius:999px;font-size:14px;font-weight:600}
+.tag.gold{background:var(--gold)}
+.tag.sample{background:#FFE7D6;color:#8A3A00}
+.dbody p{margin:0;font-size:17px;line-height:1.5;color:#26354d}
+.safety{background:#FFF6DB;border-left:5px solid var(--gold);padding:12px 14px;border-radius:10px;font-size:16px;color:#4a3a00}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:auto}
+.btn{height:54px;padding:0 20px;border-radius:14px;font-weight:700;font-size:16px;background:#EEF2F8;color:var(--navy)}
+.btn.primary{background:var(--navy);color:#fff}
+.btn.gold{background:var(--gold);color:var(--navy)}
+.btn.danger{background:#FDE2E2;color:#9b1c1c}
+.btn:active{transform:scale(.97)}
+
+.form{padding:26px 28px;display:grid;gap:14px}
+.form h3{margin:0;font:700 28px 'Barlow Condensed','Arial Narrow',sans-serif}
+.form label{display:grid;gap:6px;font-weight:600;font-size:14px;color:#3a4a63}
+.form input,.form textarea,.form select{border:2px solid #D7DEEA;border-radius:12px;padding:12px;font-size:16px;color:var(--ink);background:#fff}
+.form textarea{min-height:84px;resize:vertical}
+.form .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form .note{font-size:14px;color:#5b6b84;line-height:1.45;margin:0}
+.form hr{border:0;border-top:1px solid #E3E8F0;margin:6px 0}
+.emoji-pick{display:flex;flex-wrap:wrap;gap:6px}
+.emoji-pick button{width:44px;height:44px;border-radius:10px;background:#F1F4F9;font-size:22px}
+.emoji-pick button.on{outline:3px solid var(--gold)}
+.stage:not(.show-safety) .safety-layer{display:none}
+.icon-btn.sos{background:#C62828;color:#fff}
+.icon-btn.on{background:var(--gold);color:var(--navy)}
+.emg{padding:26px 28px;display:grid;gap:14px}
+.emg h3{margin:0;font:700 32px 'Barlow Condensed','Arial Narrow',sans-serif;color:#B71C1C}
+.callbox{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.callbox div{background:#B71C1C;color:#fff;border-radius:16px;padding:14px 18px}
+.callbox b{display:block;font-size:30px;letter-spacing:.5px}
+.emg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.emg-grid button{text-align:left;background:#0B2B5A;color:#fff;border-radius:14px;padding:14px 16px;font-weight:700;font-size:18px;min-height:64px}
+.kb-item{display:flex;gap:10px;align-items:center;justify-content:space-between;border:2px solid #E3E8F0;border-radius:12px;padding:10px 14px}
+.kb-item b{font-size:16px}.kb-item small{color:#5b6b84}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--gold);color:var(--navy);padding:12px 20px;border-radius:999px;font-weight:700;z-index:99;display:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">VB</div>
+    <div class="brand">
+      <h1>Valleybrook Concierge</h1>
+      <p>ETSU–Eastman Valleybrook · Project EARTH Workshop</p>
+    </div>
+    <div class="spacer"></div>
+    <span class="edit-flag">EDIT MODE · drag bubbles, tap to edit</span>
+    <button class="icon-btn" id="addBtn" style="display:none">＋ Add bubble</button>
+    <button class="icon-btn sos" id="sosBtn">🚨 Emergency</button>
+    <button class="icon-btn" id="exitBtn">🚪 Show exits</button>
+    <button class="icon-btn" id="resetViewBtn" title="Clear">⟲ Reset</button>
+    <button class="icon-btn" id="settingsBtn" title="Settings">⚙︎</button>
+  </header>
+
+  <main>
+    <section class="map-col">
+      <div style="display:flex;gap:12px;align-items:flex-start"><div class="chips" id="chips"></div><span class="map-hint" id="mapHint">Tap a bubble to learn more</span></div>
+      <div class="map-wrap" id="mapWrap">
+        <div class="stage" id="stage"></div>
+      </div>
+    </section>
+
+    <aside class="chat-col">
+      <div class="chat-head">
+        <div class="avatar" id="avatar">🦉</div>
+        <div>
+          <h2>Ask the Concierge</h2>
+          <small id="aiMode">Tap the mic and ask where to find anything</small>
+        </div>
+      </div>
+      <div class="voice-row">
+        <span class="toggle"><button class="sw on" id="voiceSw" aria-label="Spoken replies"></button> Spoken replies</span>
+        <span id="micStatus"></span>
+      </div>
+      <div class="msgs" id="msgs"></div>
+      <div class="suggest" id="suggest"></div>
+      <div class="composer">
+        <button class="mic" id="micBtn" aria-label="Talk">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
+        </button>
+        <input id="textIn" placeholder="…or type a question" autocomplete="off">
+        <button class="send" id="sendBtn" aria-label="Send">➤</button>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
+<input type="file" id="fileFloor" accept="image/*" hidden>
+<input type="file" id="filePhoto" accept="image/*" hidden>
+<input type="file" id="fileJson" accept="application/json" hidden>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   DATA — sample resources (placeholders until real photos/
+   floor plan are added). x/y are % positions on the map.
+   ========================================================= */
+const ABOUT = "Valleybrook is East Tennessee State University's ETSU–Eastman Valleybrook campus at 122 Pickens Road in Kingsport. Eastman Chemical donated the roughly 144-acre former research site to ETSU in 2010. It has a 72,000 square-foot research and office complex plus warehouse space, and hosts hands-on programs like Project EARTH, which focuses on designing solutions for resource-limited environments.";
+
+const SAMPLE = {
+  version: 2,
+  floorplan: "builtin",     // "builtin" = traced Building V2 Lower Level plan; or a dataURL / file path
+  aspect: 1060/1750,        // width / height of the floor plan
+  youAreHere: {x: 38.0, y: 18.6},
+
+  kb: [
+    {id:"kb-fire", category:"Emergency", title:"Fire: evacuate", keywords:["fire","smoke","burning","alarm","evacuate","evacuation","get out","leave the building"],
+     content:"Activate the nearest fire alarm. Go to the nearest exit and use the stairs, not elevators. Help people with disabilities or special needs. Meet at a designated assembly area outside and stay away from building entrances. Account for everyone. Re-enter only when authorities say so. Tap 'Show exits' to see exits and fire extinguishers on the map."},
+    {id:"kb-weather", category:"Emergency", title:"Severe weather: seek shelter", keywords:["tornado","storm","severe weather","shelter","lightning","weather"],
+     content:"Close all doors, including main corridor doors. Move to the lowest interior space of the building, such as hallways, basements and restrooms, away from windows and glass. Crouch near the floor or under heavy, well-supported objects and cover the back of your head. If you are outside with no time to get inside, lie flat in the nearest ditch or low spot and cover your head."},
+    {id:"kb-medical", category:"Emergency", title:"Medical emergency: call for help", keywords:["medical","hurt","injured","injury","bleeding","cpr","aed","defibrillator","heart","unconscious","ambulance","sick","emergency number","phone number"],
+     content:"Call first responders: 423-439-4480 from a cell phone, or 911 from a landline phone. Give first aid, CPR or use an AED as appropriate. Direct first responders to the incident location. Re-enter the area only when authorities say so. The ETSU Safety website has AED and CPR training videos."},
+    {id:"kb-power", category:"Emergency", title:"Power outage", keywords:["power outage","power out","lights out","no power","blackout","electricity"],
+     content:"For a long outage, check etsu.edu for an ETSU advisory or listen to FM 89.5. Help co-workers move out of dark areas. Unplug personal computers. Take valuables if you are told to leave. Secure hazardous materials and equipment before leaving."},
+    {id:"kb-intruder", category:"Emergency", title:"Hostile intruder: run, hide, fight", keywords:["intruder","shooter","active shooter","threat","attacker","lockdown","run hide fight"],
+     content:"Run: get away, alert others, and call first responders at 423-439-4480 from a cell or 911 from a landline. Hide: if you can't run, barricade yourself and stay quiet. Fight: only as a last resort, as if your life depends on it."},
+    {id:"kb-hazmat", category:"Emergency", title:"Hazardous materials release", keywords:["chemical","spill","hazmat","hazardous","fumes","gas leak","vapor","leak"],
+     content:"Evacuate: leave the spill area immediately, move people out of danger and alert other occupants. Confine: block the area off, close doors to contain vapors, shut down ventilation and use a hood to exhaust vapors. Notify Public Safety: 423-439-4480 from a cell phone or 911 from a landline."},
+    {id:"kb-prepared", category:"Emergency", title:"Be prepared", keywords:["etsu app","alerts","text alerts","emergency alerts","prepared","notifications"],
+     content:"Download the ETSU app. Text ETSU to 237233 to get emergency text messages. In an emergency dial 911 from a landline or 423-439-4480 from a cell phone."},
+    {id:"kb-exits", category:"Emergency", title:"Exits and evacuation routes from this kiosk", keywords:["exit","exits","nearest exit","way out","evacuation route","evacuation map","escape","fire extinguisher","fire alarm","pull station","assembly area","where do i go"],
+     content:"This kiosk is on the main corridor of Building V2, Lower Level. The posted evacuation route goes west along the main corridor to the exit at the west end, or east along the corridor, then south down the east corridor to the doors by the high bays. Fire alarms and extinguishers are along the corridors. After leaving, go to a designated assembly area and stay away from the building entrances. Tap 'Show exits' to see them on the map."},
+    {id:"kb-maintenance", category:"Facilities", title:"Elevator or maintenance help", keywords:["elevator","stuck","maintenance","broken","work order","repair","leak","facilities","light out","heat","air conditioning"],
+     content:"For elevator or maintenance help, call 439-7900 or email workorde@etsu.edu, as posted in the elevator. In case of fire, the elevators are out of service, so use the stairs."},
+    {id:"kb-valleybrook", category:"About", title:"About Valleybrook", keywords:["valleybrook","this place","campus","eastman","where am i","address"],
+     content:"Valleybrook is ETSU's Eastman Valleybrook campus at 122 Pickens Road in Kingsport, Tennessee. Eastman Chemical donated the roughly 144-acre former research site to ETSU in 2010. It has a 72,000 square-foot research and office complex plus warehouse space. You are in Building V2, Lower Level."},
+    {id:"kb-earth", category:"About", title:"About Project EARTH", keywords:["project earth","earth","what is project earth"],
+     content:"Project EARTH focuses on hands-on, experiential learning for resource-limited environments. Teams design and test solutions for clean water, food and infrastructure, and look at how environment and resource access affect health and sustainability."}
+  ],
+  categories: ["Digital Fab","Woodshop","Electronics","Project EARTH","Materials","Safety","Spaces"],
+  resources: [
+    {id:"3dprint", name:"3D Printers", emoji:"🖨️", category:"Digital Fab", x:72.6, y:7.4, location:"High Bay A (northeast high bay)",
+     summary:"Turn a digital model into a physical part, layer by layer.",
+     details:"Good for prototype parts, enclosures, brackets and models. Bring an STL file or ask staff for help with design software.",
+     safety:"Don't touch the hot nozzle or the bed while printing.", tags:["3d print","printer","pla","filament","prototype","stl","print a part"], sample:true},
+    {id:"laser", name:"Laser Cutter", emoji:"🔆", category:"Digital Fab", x:91.5, y:10.3, location:"High Bay A, east side",
+     summary:"Cuts and engraves wood, acrylic, cardboard and more.",
+     details:"Great for flat parts, signs, stencils and quick enclosures. Needs a vector file (SVG, DXF or AI).",
+     safety:"Never leave it unattended while running. No PVC or vinyl, which release toxic gas.", tags:["laser","engrave","cut acrylic","acrylic","plywood","cardboard","svg","sign"], sample:true},
+    {id:"cnc", name:"CNC Router", emoji:"⚙️", category:"Woodshop", x:71.7, y:30.3, location:"High Bay B (southeast high bay)",
+     summary:"Computer-controlled router for large wood and plastic parts.",
+     details:"Use it for furniture parts, large panels and repeatable cuts. Training is required before use.",
+     safety:"Eye and ear protection required. Keep hands clear of the gantry.", tags:["cnc","router","shopbot","mill","plywood","large cut"], sample:true},
+    {id:"saws", name:"Saws & Power Tools", emoji:"🪚", category:"Woodshop", x:77.4, y:41.7, location:"High Bay B, center",
+     summary:"Table saw, miter saw, band saw and drill press.",
+     details:"The tools you need to cut, shape and drill lumber and sheet goods.",
+     safety:"Training required. Eye protection required, and no loose sleeves or jewelry.", tags:["saw","table saw","miter","band saw","drill press","cut wood","lumber","power tools"], sample:true},
+    {id:"handtools", name:"Hand Tool Wall", emoji:"🔧", category:"Woodshop", x:91.5, y:32.6, location:"High Bay B, northeast side room",
+     summary:"Screwdrivers, wrenches, clamps, hammers, tape measures.",
+     details:"Everything on the pegboard is outlined, so please put tools back where you found them.",
+     safety:"", tags:["hand tools","screwdriver","wrench","clamp","hammer","tape measure","pliers","drill"], sample:true},
+    {id:"solder", name:"Soldering Stations", emoji:"🔥", category:"Electronics", x:43.4, y:25.4, location:"Central lab block, large room",
+     summary:"Temperature-controlled irons, fume extractors and solder.",
+     details:"For building circuits and repairing wires. Helping hands and desoldering braid are in the bench drawers.",
+     safety:"Turn the fume extractor on. Return the iron to its stand, because it is hot.", tags:["solder","soldering iron","wires","circuit","electronics","repair"], sample:true},
+    {id:"testgear", name:"Test Equipment", emoji:"📟", category:"Electronics", x:52.4, y:28.9, location:"Central lab block, large room, east bench",
+     summary:"Multimeters, oscilloscopes and bench power supplies.",
+     details:"Measure voltage, current and signals, and power prototypes safely.",
+     safety:"", tags:["multimeter","oscilloscope","power supply","voltage","measure","test"], sample:true},
+    {id:"kits", name:"Microcontroller Kits", emoji:"🤖", category:"Electronics", x:58.2, y:21.4, location:"Central lab block, northeast room",
+     summary:"Arduino, Raspberry Pi, sensors, motors and LEDs.",
+     details:"Check-out kits for sensing and automation projects, such as water-level or soil-moisture monitors.",
+     safety:"", tags:["arduino","raspberry pi","sensor","microcontroller","led","motor","kit","coding"], sample:true},
+    {id:"water", name:"Water Filtration Test Rig", emoji:"💧", category:"Project EARTH", x:44.3, y:53.1, location:"Open Bay (long south hall), north end",
+     summary:"Build and test low-cost water filters.",
+     details:"Used for Project EARTH challenges on clean water in resource-limited settings. Test turbidity before and after filtering.",
+     safety:"Wear gloves when handling sample water.", tags:["water","filter","filtration","clean water","turbidity","project earth"], sample:true},
+    {id:"grow", name:"Hydroponics & Ag Prototypes", emoji:"🌱", category:"Project EARTH", x:53.8, y:61.7, location:"Open Bay, east side",
+     summary:"Simple agricultural systems built by students.",
+     details:"Explore food growing with limited water and space: hydroponics, drip irrigation and composting.",
+     safety:"", tags:["hydroponics","plants","agriculture","farm","grow","irrigation","compost","food"], sample:true},
+    {id:"collab", name:"Collaboration Tables", emoji:"🧩", category:"Spaces", x:48.1, y:70.3, location:"Open Bay, south end",
+     summary:"Big tables, whiteboards and outlets for team work.",
+     details:"Use them for brainstorming, assembly and design reviews. Rolling whiteboards can be moved.",
+     safety:"", tags:["table","whiteboard","meeting","team","brainstorm","assemble","workspace","outlet"], sample:true},
+    {id:"materials", name:"Materials & Scrap Bin", emoji:"📦", category:"Materials", x:92.0, y:41.7, location:"High Bay B, southeast side room",
+     summary:"Lumber, acrylic, cardboard, fasteners and free scrap.",
+     details:"Scrap is free to use. Ask staff before using full sheets. Screws and bolts are in the labeled bins.",
+     safety:"", tags:["materials","wood","lumber","acrylic","cardboard","screws","bolts","fasteners","scrap","supplies"], sample:true},
+    {id:"ppe", name:"Safety & First Aid", emoji:"⛑️", category:"Safety", x:11.3, y:28.0, location:"West corridor, near the west exit",
+     summary:"Safety glasses, ear protection, gloves, first aid and eyewash.",
+     details:"Grab PPE before using any machine. The fire extinguisher and eyewash station are here too.",
+     safety:"In an emergency, call 911, then notify staff.", tags:["safety","glasses","goggles","ppe","first aid","bandage","eyewash","fire extinguisher","gloves","ear protection","hurt","injury"], sample:true},
+    {id:"desk", name:"Welcome Desk", emoji:"👋", category:"Spaces", x:49.1, y:36.3, location:"Cross corridor, center",
+     summary:"Sign in, get oriented and find staff.",
+     details:"New visitors start here. Staff can book machine training and check out kits.",
+     safety:"", tags:["sign in","welcome","staff","help","entrance","front desk","training","check out"], sample:true},
+    {id:"restroom", name:"Restrooms", emoji:"🚻", category:"Spaces", x:20.8, y:30.9, location:"Central block, west lab area",
+     summary:"Restrooms and a sink for washing up.",
+     details:"", safety:"", tags:["restroom","bathroom","toilet","wash hands","sink"], sample:true}
+  ]
+};
+
+/* ---------- Storage ---------- */
+const KEY = "vb-concierge-data-v1", SKEY = "vb-concierge-settings-v1";
+const clone = o => JSON.parse(JSON.stringify(o));
+function load(k, fallback){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; }catch(e){ return fallback; } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){ toast("Couldn't save. Storage is full, so use Export."); } }
+function saveSettings(){ try{ localStorage.setItem(SKEY, JSON.stringify(settings)); }catch(e){} }
+
+let data = load(KEY, null) || clone(SAMPLE);
+if(!data.version || data.version < 2){ const old=data; data = clone(SAMPLE); if(old && old.kb) data.kb = old.kb; try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){} }
+if(!data.kb) data.kb = clone(SAMPLE.kb);
+// add any new built-in articles without bringing back ones the team deleted
+if(!data.kbSeeded) data.kbSeeded = data.kb.map(k=>k.id);
+SAMPLE.kb.forEach(k=>{ if(!data.kbSeeded.includes(k.id)){ data.kbSeeded.push(k.id); if(!data.kb.some(x=>x.id===k.id)) data.kb.push(clone(k)); } });
+let settings = Object.assign({apiKey:"", model:"claude-haiku-5-5", voice:"", rate:1, speak:true, idleSec:180}, load(SKEY, {}));
+
+/* ---------- Helpers ---------- */
+const $ = s => document.querySelector(s);
+const el = (tag, props={}, ...kids) => { const n = document.createElement(tag); Object.assign(n, props); kids.flat().forEach(k => k!=null && n.append(k)); return n; };
+function toast(t){ const n=$("#toast"); n.textContent=t; n.style.display="block"; clearTimeout(n._t); n._t=setTimeout(()=>n.style.display="none",2600); }
+const byId = id => data.resources.find(r => r.id === id);
+
+/* =========================================================
+   MAP
+   ========================================================= */
+let editing = false, activeCat = null, highlighted = new Set();
+
+/* Traced from the posted "Valleybrook Building V2 Lower Level" evacuation sign (dated 2/9/11).
+   Coordinates are in the sign photo's pixel space; T() shifts them into the SVG viewBox. */
+const PLAN = {
+  outline:[[200,88],[1220,88],[1220,870],[905,870],[905,800],[855,800],[855,1485],[640,1485],[640,1465],[595,1465],[595,1800],[385,1800],[385,1335],[360,1335],[360,830],[290,830],[290,745],[270,745],[270,378],[200,378]],
+  corridors:[[270,378,590,32],[270,410,60,335],[270,675,585,70],[822,410,38,265],[805,745,50,585],[440,95,45,283],[640,95,40,283],[445,745,133,87],[578,745,54,155],[385,1300,210,48],[485,900,15,400],[482,1497,18,175]],
+  rooms:[
+    [205,95,45,85,"stair"],[250,110,45,70,"elev"],[205,230,60,50],[205,285,65,90],
+    [275,95,165,90],[275,185,165,88],[275,273,165,100],
+    [490,125,150,75],[490,205,57,168],[548,205,42,95],[590,215,50,45],[590,260,50,40],[548,300,92,73],
+    [680,95,130,92],[680,187,130,90],[680,277,130,96],[815,240,45,138,"stair"],
+    [860,95,360,405,"bay"],[865,500,355,370,"bay"],[1090,555,130,175],[1090,730,130,140],
+    [335,415,45,110],[380,415,50,110],[430,415,50,110],[480,415,80,110],[335,530,165,145],[390,535,110,55,"bench"],[505,530,55,65],[500,595,60,80],
+    [600,415,172,58],[772,415,50,55],[772,470,50,50],[600,473,172,132],[772,520,50,85],[600,605,77,72],[677,605,48,72],[725,605,47,72],[772,605,50,72],
+    [295,745,57,85],[352,745,38,45],[390,745,55,45],[360,797,118,113],[500,832,78,68],
+    [657,750,73,47],[730,750,80,47],[632,797,178,23],[632,820,178,80],
+    [578,900,227,530,"bay"],[640,1432,85,53],[725,1432,117,53],[805,1330,40,100],
+    [365,950,62,57],[427,950,58,57],[365,1007,62,58],[427,1007,58,58],[365,1085,62,55],[427,1085,58,55],[365,1140,62,58],[427,1140,58,58],
+    [385,1217,100,83],[500,900,80,97],[500,1000,80,152],[535,1155,48,60],[510,1215,73,73],
+    [385,1350,63,55],[385,1405,63,52],[385,1457,63,61],[448,1350,145,147],[392,1518,90,82],[392,1600,90,72],[500,1497,92,175],[393,1672,200,128]
+  ],
+  partitions:[[1095,95,1095,390],[870,390,1095,390]],
+  labels:[[1040,300,"HIGH BAY A"],[1040,690,"HIGH BAY B"],[690,1180,"OPEN BAY"],[565,398,"MAIN CORRIDOR",11],[700,715,"CROSS CORRIDOR",11]],
+  exits:[[200,215,"W"],[262,394,"W"],[270,560,"W"],[272,728,"W"],[880,785,"E"],[372,1318,"W"],[852,1318,"E"],[852,1440,"E"],[500,1805,"S"]],
+  extinguishers:[[453,105],[680,105],[275,255],[570,380],[535,690],[1197,350],[1085,665],[905,725],[368,937],[505,1340],[592,1388],[505,1485],[510,1630],[478,1685],[525,1785]],
+  alarms:[[222,200],[270,200],[277,415],[287,582],[342,680],[610,682],[1090,290],[915,703],[862,752],[842,852],[840,1322],[595,1452]],
+  route:[[[583,395],[262,395]],[[583,395],[840,395],[840,718],[880,718],[880,775]]]
+};
+function builtinPlan(){
+  const T=(x,y)=>[x-180,y-70];
+  const pts=a=>a.map(p=>T(p[0],p[1]).join(",")).join(" ");
+  let o=`<svg class="plan" viewBox="0 0 1060 1750" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" font-family="Barlow Condensed,Arial Narrow,sans-serif">
+  <defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="#C9C1AE" stroke-width="2"/></pattern>
+  <marker id="arw" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0L10,5L0,10z" fill="#E5484D"/></marker></defs>
+  <rect width="1060" height="1750" fill="#F4F1EA"/>
+  <polygon points="${pts(PLAN.outline)}" fill="#FFFFFF" stroke="#041E42" stroke-width="9" stroke-linejoin="round"/>`;
+  PLAN.corridors.forEach(([x,y,w,h])=>{const[a,b]=T(x,y);o+=`<rect x="${a}" y="${b}" width="${w}" height="${h}" fill="#E9EEF6"/>`;});
+  PLAN.rooms.forEach(([x,y,w,h,k])=>{const[a,b]=T(x,y);
+    const fill=k==="bay"?"#FFF8E3":k==="stair"||k==="elev"?"url(#hatch)":k==="bench"?"#E4DED0":"#FFFFFF";
+    o+=`<rect x="${a}" y="${b}" width="${w}" height="${h}" fill="${fill}" stroke="#2B3D5C" stroke-width="${k==="bench"?2:3.5}"/>`;
+    if(k==="elev") o+=`<line x1="${a}" y1="${b}" x2="${a+w}" y2="${b+h}" stroke="#2B3D5C" stroke-width="2"/><line x1="${a+w}" y1="${b}" x2="${a}" y2="${b+h}" stroke="#2B3D5C" stroke-width="2"/>`;
+  });
+  PLAN.partitions.forEach(([x1,y1,x2,y2])=>{const[a,b]=T(x1,y1),[c,d]=T(x2,y2);o+=`<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke="#2B3D5C" stroke-width="3.5"/>`;});
+  o+=`<polygon points="${pts(PLAN.outline)}" fill="none" stroke="#041E42" stroke-width="9" stroke-linejoin="round"/>`;
+  PLAN.labels.forEach(([x,y,t,fs])=>{const[a,b]=T(x,y);o+=`<text x="${a}" y="${b}" text-anchor="middle" font-size="${fs||30}" font-weight="700" fill="${fs?'#7C8BA6':'#B7A57A'}" letter-spacing="2">${t}</text>`;});
+  // safety layer (exits, alarms, extinguishers, evacuation route) — toggled with "Show exits"
+  o+=`<g class="safety-layer">`;
+  PLAN.route.forEach(r=>o+=`<polyline points="${pts(r)}" fill="none" stroke="#E5484D" stroke-width="6" stroke-dasharray="14 9" marker-end="url(#arw)"/>`);
+  PLAN.extinguishers.forEach(([x,y])=>{const[a,b]=T(x,y);o+=`<rect x="${a-6}" y="${b-12}" width="12" height="24" rx="4" fill="#E5484D" stroke="#fff" stroke-width="2"/>`;});
+  PLAN.alarms.forEach(([x,y])=>{const[a,b]=T(x,y);o+=`<path d="M${a} ${b-11}L${a+11} ${b+9}L${a-11} ${b+9}Z" fill="#E5484D" stroke="#fff" stroke-width="2"/>`;});
+  PLAN.exits.forEach(([x,y])=>{const[a,b]=T(x,y);o+=`<g transform="translate(${a},${b})"><rect x="-30" y="-15" width="60" height="30" rx="7" fill="#1F9D55" stroke="#fff" stroke-width="3"/><text y="7" text-anchor="middle" font-size="19" font-weight="700" fill="#fff">EXIT</text></g>`;});
+  o+=`</g><text x="1040" y="1735" text-anchor="end" font-size="20" fill="#9A927E">BUILDING V2 · LOWER LEVEL</text></svg>`;
+  return o;
+}
+
+function renderChips(){
+  const c = $("#chips"); c.innerHTML = "";
+  const all = el("button",{className:"chip"+(activeCat?"":" on"),textContent:"All"}); all.onclick=()=>{activeCat=null;renderChips();renderBubbles();};
+  c.append(all);
+  data.categories.forEach(cat=>{
+    if(!data.resources.some(r=>r.category===cat)) return;
+    const b = el("button",{className:"chip"+(activeCat===cat?" on":""),textContent:cat});
+    b.onclick=()=>{activeCat = activeCat===cat?null:cat; renderChips(); renderBubbles();};
+    c.append(b);
+  });
+}
+
+function fitStage(){
+  const wrap = $("#mapWrap"), st = $("#stage"), ar = data.aspect || 1.6;
+  const pw = wrap.clientWidth, ph = wrap.clientHeight;
+  let w = pw, h = w / ar; if(h > ph){ h = ph; w = h * ar; }
+  st.style.width = w+"px"; st.style.height = h+"px";
+  st.classList.toggle("compact", Math.min(w,h) < 760);
+  st.style.setProperty("--bs", Math.max(40, Math.min(62, Math.min(w,h)/13))+"px");
+}
+
+function renderStage(){
+  const st = $("#stage");
+  st.innerHTML = (data.floorplan && data.floorplan!=="builtin") ? `<img class="plan" src="${data.floorplan}" alt="Floor plan">` : builtinPlan();
+  st.classList.toggle("show-safety", showSafety);
+  if(data.youAreHere){
+    const y = el("div",{className:"youarehere"}, el("span",{textContent:"📍 You are here"}));
+    y.style.left=data.youAreHere.x+"%"; y.style.top=data.youAreHere.y+"%"; st.append(y);
+  }
+  $("#mapHint").textContent = editing ? "Drag bubbles to move them · tap one to edit" : "Tap a bubble to learn more";
+  renderBubbles(); fitStage();
+}
+
+function renderBubbles(){
+  const st = $("#stage");
+  st.querySelectorAll(".bubble").forEach(n=>n.remove());
+  data.resources.forEach(r=>{
+    const b = el("button",{className:"bubble"},
+      el("div",{className:"dot",textContent:r.emoji||"⭐"}),
+      el("div",{className:"lbl",textContent:r.name}));
+    b.style.left=r.x+"%"; b.style.top=r.y+"%"; b.dataset.id=r.id;
+    if(activeCat && r.category!==activeCat) b.classList.add("dim");
+    if(highlighted.has(r.id)) b.classList.add("hl");
+    attachBubbleEvents(b, r);
+    st.append(b);
+  });
+}
+
+function attachBubbleEvents(b, r){
+  let start=null, moved=false;
+  b.addEventListener("pointerdown", e=>{
+    if(!editing) return;
+    start={x:e.clientX,y:e.clientY}; moved=false; b.setPointerCapture(e.pointerId);
+  });
+  b.addEventListener("pointermove", e=>{
+    if(!editing || !start) return;
+    if(Math.hypot(e.clientX-start.x, e.clientY-start.y) > 6) moved = true;
+    if(!moved) return;
+    const rect = $("#stage").getBoundingClientRect();
+    r.x = Math.max(0,Math.min(100, (e.clientX-rect.left)/rect.width*100));
+    r.y = Math.max(0,Math.min(100, (e.clientY-rect.top)/rect.height*100));
+    b.style.left=r.x+"%"; b.style.top=r.y+"%";
+  });
+  b.addEventListener("pointerup", ()=>{ if(editing && moved){ r.x=+r.x.toFixed(1); r.y=+r.y.toFixed(1); save(); } start=null; });
+  b.addEventListener("click", ()=>{ if(moved){ moved=false; return; } editing ? openEditor(r) : openDetail(r); });
+}
+
+function highlight(ids){
+  highlighted = new Set(ids||[]);
+  if(ids && ids.length) activeCat = null, renderChips();
+  renderBubbles();
+}
+
+/* =========================================================
+   DETAIL / EDITOR SHEETS
+   ========================================================= */
+function openSheet(node){ const s=$("#sheet"); s.innerHTML=""; s.append(node); $("#scrim").classList.add("open"); }
+function closeSheet(){ $("#scrim").classList.remove("open"); }
+$("#scrim").addEventListener("click", e=>{ if(e.target.id==="scrim") closeSheet(); });
+
+function openDetail(r){
+  highlight([r.id]);
+  const photo = el("div",{className:"photo"});
+  if(r.photo){ photo.append(el("img",{src:r.photo,alt:r.name})); }
+  else { photo.append(document.createTextNode(r.emoji||"⭐")); photo.append(el("span",{className:"ph-note",textContent:"Photo coming soon"})); }
+  const tags = el("div",{className:"tagrow"}, el("span",{className:"tag gold",textContent:r.category}));
+  if(r.sample) tags.append(el("span",{className:"tag sample",textContent:"Sample info · verify"}));
+  const body = el("div",{className:"dbody"},
+    el("h3",{textContent:r.name}), tags,
+    el("p",{innerHTML:"<b>📍 "+esc(r.location||"")+"</b>"}),
+    el("p",{textContent:r.summary||""}),
+    r.details ? el("p",{textContent:r.details}) : null,
+    r.safety ? el("div",{className:"safety",textContent:"⚠️ "+r.safety}) : null
+  );
+  const read = el("button",{className:"btn gold",textContent:"🔊 Read aloud"});
+  read.onclick=()=>speak(`${r.name}. ${r.location}. ${r.summary} ${r.details||""} ${r.safety?("Safety note: "+r.safety):""}`);
+  const ask = el("button",{className:"btn primary",textContent:"💬 Ask about this"});
+  ask.onclick=()=>{ closeSheet(); sendText(`Tell me more about the ${r.name}`); };
+  const close = el("button",{className:"btn",textContent:"Close"}); close.onclick=closeSheet;
+  body.append(el("div",{className:"actions"}, read, ask, close));
+  openSheet(el("div",{className:"detail"}, photo, body));
+}
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+const EMOJIS = ["🖨️","🔆","⚙️","🪚","🔧","🔨","🔥","📟","🤖","💻","💧","🌱","☀️","🔋","🧩","📦","⛑️","👋","🚻","🧵","🎨","🧪","🔬","📷","🪴","🚪","♻️","🛠️","⭐"];
+
+function openEditor(r, isNew){
+  const f = el("div",{className:"form"});
+  const inp = (label,key,ph="") => { const i=el("input",{value:r[key]||"",placeholder:ph}); i.oninput=()=>r[key]=i.value; return el("label",{},label,i); };
+  const ta = (label,key) => { const i=el("textarea",{value:r[key]||""}); i.oninput=()=>r[key]=i.value; return el("label",{},label,i); };
+  const catSel = el("select"); [...data.categories,"+ New category…"].forEach(c=>catSel.append(el("option",{value:c,textContent:c,selected:c===r.category})));
+  catSel.onchange=()=>{ if(catSel.value.startsWith("+")){ const n=prompt("New category name"); if(n){ data.categories.push(n); r.category=n; catSel.prepend(el("option",{value:n,textContent:n,selected:true})); } } else r.category=catSel.value; };
+  const ep = el("div",{className:"emoji-pick"});
+  EMOJIS.forEach(e=>{ const b=el("button",{textContent:e,className:r.emoji===e?"on":""}); b.onclick=()=>{r.emoji=e; ep.querySelectorAll("button").forEach(x=>x.classList.remove("on")); b.classList.add("on");}; ep.append(b); });
+  const tags = el("input",{value:(r.tags||[]).join(", ")}); tags.oninput=()=>r.tags=tags.value.split(",").map(s=>s.trim()).filter(Boolean);
+  const photoBtn = el("button",{className:"btn",textContent: r.photo ? "📷 Replace photo" : "📷 Add photo"});
+  photoBtn.onclick=()=>pickImage("#filePhoto", 1000, url=>{ r.photo=url; photoBtn.textContent="📷 Photo added ✓"; });
+  const photoPath = el("input",{placeholder:"…or a file path, e.g. photos/laser.jpg", value: (r.photo && !r.photo.startsWith("data:")) ? r.photo : ""});
+  photoPath.oninput=()=>{ r.photo = photoPath.value.trim() || null; };
+  const sampleChk = el("input",{type:"checkbox",checked:!!r.sample}); sampleChk.onchange=()=>r.sample=sampleChk.checked;
+
+  const saveB = el("button",{className:"btn primary",textContent:"Save"});
+  saveB.onclick=()=>{ if(isNew) data.resources.push(r); save(); renderChips(); renderBubbles(); closeSheet(); toast("Saved"); };
+  const del = el("button",{className:"btn danger",textContent:"Delete"});
+  del.onclick=()=>{ if(confirm(`Delete "${r.name}"?`)){ data.resources = data.resources.filter(x=>x!==r); save(); renderBubbles(); closeSheet(); } };
+  const cancel = el("button",{className:"btn",textContent:"Cancel"});
+  cancel.onclick=()=>{ data = load(KEY, data); closeSheet(); renderBubbles(); };
+
+  f.append(
+    el("h3",{textContent: isNew ? "Add a resource" : "Edit resource"}),
+    el("div",{className:"row"}, inp("Name","name","e.g. Laser Cutter"), el("label",{},"Category",catSel)),
+    inp("Where is it?","location","e.g. Digital Fab area, north wall"),
+    inp("One-line summary","summary"),
+    ta("Details","details"),
+    inp("Safety note (optional)","safety"),
+    el("label",{},"Search words (comma-separated) to help the concierge find it",tags),
+    el("label",{},"Icon",ep),
+    el("div",{className:"row"}, photoBtn, photoPath),
+    el("label",{style:"display:flex;gap:10px;align-items:center"}, sampleChk, "Show “sample info” badge"),
+    el("div",{className:"actions"}, saveB, isNew?null:del, cancel)
+  );
+  openSheet(f);
+}
+
+$("#addBtn").onclick=()=>{
+  openEditor({id:"r"+Date.now().toString(36), name:"New resource", emoji:"⭐", category:data.categories[0], x:50, y:50, location:"", summary:"", details:"", safety:"", tags:[], sample:false}, true);
+};
+
+/* Downscale uploaded images so they fit in browser storage */
+function pickImage(sel, maxDim, cb){
+  const input=$(sel); input.value="";
+  input.onchange=()=>{
+    const file=input.files[0]; if(!file) return;
+    const img=new Image(), rd=new FileReader();
+    rd.onload=()=>{ img.onload=()=>{
+      const s=Math.min(1, maxDim/Math.max(img.width,img.height));
+      const c=document.createElement("canvas"); c.width=Math.round(img.width*s); c.height=Math.round(img.height*s);
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      cb(c.toDataURL("image/jpeg",.85), img.width/img.height);
+    }; img.src=rd.result; };
+    rd.readAsDataURL(file);
+  };
+  input.click();
+}
+
+/* =========================================================
+   SAFETY LAYER, EMERGENCY SHEET, KNOWLEDGE BASE
+   ========================================================= */
+let showSafety=false;
+function setSafety(on){ showSafety=on; $("#stage").classList.toggle("show-safety",on); $("#exitBtn").classList.toggle("on",on); $("#exitBtn").textContent = on ? "🚪 Hide exits" : "🚪 Show exits"; }
+$("#exitBtn").onclick=()=>setSafety(!showSafety);
+
+$("#sosBtn").onclick=openEmergency;
+function openEmergency(){
+  const f=el("div",{className:"emg"});
+  const grid=el("div",{className:"emg-grid"});
+  data.kb.filter(k=>k.category==="Emergency").forEach(k=>{ const b=el("button",{textContent:k.title}); b.onclick=()=>openKBArticle(k); grid.append(b); });
+  const ex=el("button",{className:"btn gold",textContent:"🚪 Show exits & extinguishers on map"}); ex.onclick=()=>{ setSafety(true); closeSheet(); };
+  const cl=el("button",{className:"btn",textContent:"Close"}); cl.onclick=closeSheet;
+  f.append(el("h3",{textContent:"🚨 Emergency Procedures · Valleybrook"}),
+    el("div",{className:"callbox"}, el("div",{innerHTML:"From a cell phone<b>423-439-4480</b>"}), el("div",{innerHTML:"From a landline<b>911</b>"})),
+    grid, el("div",{className:"actions"}, ex, cl),
+    el("p",{className:"note",style:"color:#5b6b84;margin:0",textContent:"From the posted ETSU Emergency Management sign. Follow staff and first responder instructions."}));
+  openSheet(f);
+  speak("Emergency. Call 4 2 3, 4 3 9, 4 4 8 0 from a cell phone, or 9 1 1 from a landline. Tap a situation for instructions.");
+}
+function openKBArticle(k){
+  const f=el("div",{className:"emg"});
+  const rd=el("button",{className:"btn gold",textContent:"🔊 Read aloud"}); rd.onclick=()=>speak(k.title+". "+k.content);
+  const ex=el("button",{className:"btn primary",textContent:"🚪 Show exits"}); ex.onclick=()=>{ setSafety(true); closeSheet(); };
+  const bk=el("button",{className:"btn",textContent:"Close"}); bk.onclick=closeSheet;
+  f.append(el("h3",{textContent:k.title,style:k.category==="Emergency"?"":"color:var(--navy)"}), el("p",{style:"font-size:19px;line-height:1.55;margin:0;white-space:pre-wrap",textContent:k.content}),
+    el("div",{className:"actions"}, rd, k.category==="Emergency"?ex:null, bk));
+  openSheet(f); speak(k.title+". "+k.content);
+}
+function openKB(){
+  const f=el("div",{className:"form"});
+  const list=el("div",{style:"display:grid;gap:8px"});
+  data.kb.forEach(k=>{ const e=el("button",{className:"btn",textContent:"Edit"}); e.onclick=()=>editKB(k);
+    list.append(el("div",{className:"kb-item"}, el("div",{}, el("b",{textContent:k.title}), el("br"), el("small",{textContent:k.category+" · "+(k.keywords||[]).slice(0,5).join(", ")})), e)); });
+  const add=el("button",{className:"btn primary",textContent:"＋ Add article"}); add.onclick=()=>editKB({id:"kb-"+Date.now().toString(36),category:"General",title:"",keywords:[],content:""},true);
+  const cl=el("button",{className:"btn",textContent:"Close"}); cl.onclick=closeSheet;
+  f.append(el("h3",{textContent:"📚 Knowledge base"}), el("p",{className:"note",textContent:"The concierge answers from these articles and the map bubbles. Add policies, hours, training rules, contacts, how-tos and so on. Articles in the “Emergency” category show up under the 🚨 Emergency button."}), list, el("div",{className:"actions"}, add, cl));
+  openSheet(f);
+}
+function editKB(k,isNew){
+  const f=el("div",{className:"form"});
+  const t=el("input",{value:k.title}), c=el("input",{value:k.category,placeholder:"Emergency, About, Policies, How-to…"}), kw=el("input",{value:(k.keywords||[]).join(", ")}), ct=el("textarea",{value:k.content,style:"min-height:200px"});
+  const sv=el("button",{className:"btn primary",textContent:"Save"}); sv.onclick=()=>{ k.title=t.value.trim()||"Untitled"; k.category=c.value.trim()||"General"; k.keywords=kw.value.split(",").map(x=>x.trim()).filter(Boolean); k.content=ct.value.trim(); if(isNew) data.kb.push(k); save(); openKB(); toast("Saved"); };
+  const del=el("button",{className:"btn danger",textContent:"Delete"}); del.onclick=()=>{ if(confirm("Delete this article?")){ data.kb=data.kb.filter(x=>x!==k); save(); openKB(); } };
+  const bk=el("button",{className:"btn",textContent:"Back"}); bk.onclick=()=>{ data=load(KEY,data); openKB(); };
+  f.append(el("h3",{textContent:isNew?"New article":"Edit article"}), el("div",{className:"row"}, el("label",{},"Title",t), el("label",{},"Category",c)),
+    el("label",{},"Keywords people might say (comma-separated)",kw), el("label",{},"Content",ct), el("div",{className:"actions"}, sv, isNew?null:del, bk));
+  openSheet(f);
+}
+
+/* =========================================================
+   SETTINGS
+   ========================================================= */
+$("#settingsBtn").onclick = openSettings;
+function openSettings(){
+  const f = el("div",{className:"form"});
+  const key = el("input",{type:"password",value:settings.apiKey,placeholder:"sk-ant-…"}); key.oninput=()=>settings.apiKey=key.value.trim();
+  const model = el("input",{value:settings.model}); model.oninput=()=>settings.model=model.value.trim();
+  const vSel = el("select"); vSel.append(el("option",{value:"",textContent:"Default voice"}));
+  speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en")).forEach(v=>vSel.append(el("option",{value:v.name,textContent:`${v.name} (${v.lang})`,selected:v.name===settings.voice})));
+  vSel.onchange=()=>settings.voice=vSel.value;
+  const rate = el("input",{type:"range",min:.7,max:1.3,step:.05,value:settings.rate}); rate.oninput=()=>settings.rate=+rate.value;
+  const idle = el("input",{type:"number",min:0,value:settings.idleSec}); idle.oninput=()=>settings.idleSec=+idle.value;
+
+  const editT = el("button",{className:"btn "+(editing?"gold":"primary"),textContent: editing ? "✓ Done editing" : "✏️ Edit map & bubbles"});
+  editT.onclick=()=>{ setEditing(!editing); closeSheet(); };
+  const floorB = el("button",{className:"btn",textContent:"🗺️ Upload floor plan drawing"});
+  floorB.onclick=()=>pickImage("#fileFloor", 2400, (url,ar)=>{ data.floorplan=url; data.aspect=ar; save(); renderStage(); toast("Floor plan updated"); });
+  const floorClear = el("button",{className:"btn",textContent:"Use traced V2 plan"});
+  floorClear.onclick=()=>{ data.floorplan="builtin"; data.aspect=1060/1750; save(); renderStage(); };
+  const kbB = el("button",{className:"btn primary",textContent:"📚 Knowledge base"});
+  kbB.onclick=openKB;
+  const yah = el("button",{className:"btn",textContent:"📍 Move “You are here”"});
+  yah.onclick=()=>{ closeSheet(); toast("Tap the map where this screen is"); const st=$("#stage");
+    const h=e=>{ const r=st.getBoundingClientRect(); data.youAreHere={x:(e.clientX-r.left)/r.width*100,y:(e.clientY-r.top)/r.height*100}; save(); renderStage(); st.removeEventListener("click",h,true); e.stopPropagation(); };
+    st.addEventListener("click",h,true); };
+  const exp = el("button",{className:"btn",textContent:"⬇️ Export data"});
+  exp.onclick=()=>{ const a=el("a",{href:URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"})),download:"valleybrook-concierge-data.json"}); a.click(); };
+  const imp = el("button",{className:"btn",textContent:"⬆️ Import data"});
+  imp.onclick=()=>{ const i=$("#fileJson"); i.value=""; i.onchange=()=>{ const rd=new FileReader(); rd.onload=()=>{ try{ data=JSON.parse(rd.result); save(); renderChips(); renderStage(); toast("Imported"); closeSheet(); }catch(e){ alert("That file isn't valid concierge data."); } }; rd.readAsText(i.files[0]); }; i.click(); };
+  const reset = el("button",{className:"btn danger",textContent:"Reset to sample data"});
+  reset.onclick=()=>{ if(confirm("Replace everything with the sample data?")){ data=clone(SAMPLE); save(); renderChips(); renderStage(); closeSheet(); } };
+  const done = el("button",{className:"btn primary",textContent:"Save settings"});
+  done.onclick=()=>{ saveSettings(); updateMode(); closeSheet(); toast("Settings saved"); };
+
+  f.append(
+    el("h3",{textContent:"Settings"}),
+    el("p",{className:"note",textContent:"Map & content"}),
+    el("div",{className:"actions"}, editT, kbB, floorB, floorClear, yah),
+    el("div",{className:"actions"}, exp, imp, reset),
+    el("hr"),
+    el("p",{className:"note",innerHTML:"<b>AI brain.</b> Without a key, the concierge uses built-in keyword matching, which works offline. With an Anthropic API key, it answers conversationally using Claude. The key is stored only in this browser. For a public kiosk, move the key to a small server later."}),
+    el("div",{className:"row"}, el("label",{},"Anthropic API key",key), el("label",{},"Model",model)),
+    el("hr"),
+    el("div",{className:"row"}, el("label",{},"Voice",vSel), el("label",{},"Speaking speed",rate)),
+    el("label",{},"Auto-reset after idle (seconds, 0 = off)",idle),
+    el("div",{className:"actions"}, done)
+  );
+  openSheet(f);
+}
+function setEditing(on){
+  editing=on; document.body.classList.toggle("editing",on);
+  $("#addBtn").style.display = on ? "inline-flex" : "none";
+  renderStage();
+}
+
+/* =========================================================
+   CONCIERGE (chat + voice)
+   ========================================================= */
+const chatHistory = [];   // {role, content} for the AI
+const GREETING = "Hi! I'm the Valleybrook Concierge. Ask me where to find a tool, what a machine does, or what you need for your project.";
+const SUGGESTIONS = ["Where's the nearest exit?","What do I do in a tornado?","Where's the 3D printer?","I need to cut acrylic","What is Project EARTH?","Who do I call if someone is hurt?"];
+
+function updateMode(){ $("#aiMode").textContent = settings.apiKey ? "AI mode · powered by Claude" : "Tap the mic and ask where to find anything"; }
+
+function addMsg(role, text, ids){
+  const m = el("div",{className:"msg "+role,textContent:text});
+  if(ids && ids.length){
+    const links = el("div",{className:"links"});
+    ids.map(byId).filter(Boolean).forEach(r=>{ const b=el("button",{textContent:(r.emoji||"")+" "+r.name}); b.onclick=()=>openDetail(r); links.append(b); });
+    m.append(links);
+  }
+  $("#msgs").append(m); $("#msgs").scrollTop = 1e9; return m;
+}
+
+function resetChat(){
+  $("#msgs").innerHTML=""; chatHistory.length=0; addMsg("bot",GREETING);
+  const s=$("#suggest"); s.innerHTML="";
+  SUGGESTIONS.forEach(q=>{ const b=el("button",{textContent:q}); b.onclick=()=>sendText(q); s.append(b); });
+}
+
+let busy=false;
+async function sendText(text){
+  text=(text||"").trim(); if(!text || busy) return;
+  busy=true; stopSpeaking();
+  addMsg("user",text); $("#textIn").value="";
+  const thinking = addMsg("bot","…"); thinking.classList.add("typing");
+  let reply;
+  try{ reply = settings.apiKey ? await askClaude(text) : localAnswer(text); }
+  catch(e){ console.warn(e); reply = localAnswer(text); reply.text = "(Offline mode) " + reply.text; }
+  thinking.remove();
+  addMsg("bot", reply.text, reply.ids);
+  chatHistory.push({role:"user",content:text},{role:"assistant",content:reply.text});
+  highlight(reply.ids);
+  speak(reply.text);
+  busy=false;
+}
+
+/* ---- Offline brain: keyword scoring ---- */
+const STOP = new Set("the a an is are where can i find to of in on for my do you have what how get need want with and or me it there any some use using this that please tell about where's whats what's is there".split(" "));
+function words(s){ return s.toLowerCase().replace(/[^a-z0-9\s]/g," ").split(/\s+/).filter(w=>w && !STOP.has(w)); }
+function stem(w){ return w.replace(/(ing|ers|er|es|s)$/,""); }
+function bestKB(ql){
+  let best=null;
+  (data.kb||[]).forEach(k=>{
+    let s=0; (k.keywords||[]).forEach(w=>{ const wl=w.toLowerCase().trim(); if(wl && new RegExp("\\b"+wl.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b").test(ql)) s += 4 + wl.split(" ").length; });
+    if(ql.includes(k.title.toLowerCase())) s+=6;
+    if(!best || s>best.s) best={k,s};
+  });
+  return best;
+}
+function localAnswer(q){
+  const ql = q.toLowerCase();
+  if(/^(hi|hello|hey|good (morning|afternoon))\b/.test(ql) && ql.length<25) return {text:"Hello! What are you looking for today?", ids:[]};
+  const kbHit = bestKB(ql);
+  if(kbHit && kbHit.s >= 4){
+    if(kbHit.k.category==="Emergency" && /exit|route|extinguisher|alarm|fire|evacuat/.test(ql)) setSafety(true);
+    const ids = kbHit.k.id==="kb-earth" ? data.resources.filter(r=>r.category==="Project EARTH").map(r=>r.id) : [];
+    return {text:kbHit.k.content, ids, kb:kbHit.k};
+  }
+  const qw = words(q).map(stem);
+  const scored = data.resources.map(r=>{
+    let s=0;
+    const name=r.name.toLowerCase(), hay=[r.name,r.category,r.summary,r.details,r.location].join(" ").toLowerCase();
+    (r.tags||[]).forEach(t=>{ const tl=t.toLowerCase(); if(ql.includes(tl)) s+= 4 + tl.split(" ").length; });
+    qw.forEach(w=>{ if(w.length<3) return; if(name.includes(w)) s+=4; else if((r.tags||[]).some(t=>t.toLowerCase().includes(w))) s+=2; else if(hay.includes(w)) s+=1; });
+    return {r,s};
+  }).filter(x=>x.s>0).sort((a,b)=>b.s-a.s);
+  if(!scored.length) return {text:"I'm not sure where that is yet. Try asking another way, or check with staff at the Welcome Desk. I've highlighted it for you.", ids:["desk"].filter(byId)};
+  const top = scored.filter(x=>x.s >= scored[0].s*0.5).slice(0,3).map(x=>x.r);
+  const first = top[0];
+  let text = `The ${first.name} ${/s$/.test(first.name)?"are":"is"} in the ${first.location}. ${first.summary}`;
+  if(first.safety) text += ` Safety tip: ${first.safety}`;
+  if(top.length>1) text += ` You might also want the ${top.slice(1).map(r=>r.name).join(" or the ")}.`;
+  text += " I've highlighted it on the map.";
+  return {text, ids:top.map(r=>r.id)};
+}
+
+/* ---- Claude brain ---- */
+async function askClaude(text){
+  const catalog = data.resources.map(r=>({id:r.id,name:r.name,category:r.category,location:r.location,summary:r.summary,details:r.details,safety:r.safety,tags:r.tags}));
+  const system = `You are the Valleybrook Concierge, a friendly voice assistant on a touchscreen kiosk inside the Project EARTH workshop at ETSU's Eastman Valleybrook campus in Kingsport, Tennessee.
+About the site: ${ABOUT}
+Your job: help visitors find tools, equipment, materials and spaces in the workshop, explain what things do, and suggest what they'd need for a project.
+Rules:
+- Your reply will be spoken aloud. Keep it to 1-3 short, natural sentences. No markdown, lists, or emoji.
+- Only state locations that appear in the catalog below. If something isn't in the catalog, say you're not sure and suggest the Welcome Desk staff.
+- Mention safety notes when relevant.
+- On the very last line, write HIGHLIGHT: followed by comma-separated ids of the catalog items to highlight on the map (or HIGHLIGHT: none).
+- For safety and emergency questions, answer ONLY from the knowledge base, give the phone numbers exactly as written (423-439-4480 from a cell phone, 911 from a landline), and never guess. If someone describes an emergency happening now, tell them to call first.
+- If the reply is about exits, evacuation, fire alarms or extinguishers, add SHOW_EXITS on its own line before the HIGHLIGHT line.
+Knowledge base (JSON):
+${JSON.stringify(data.kb.map(k=>({title:k.title,category:k.category,content:k.content})))}
+Workshop catalog (JSON):
+${JSON.stringify(catalog)}`;
+  const res = await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"content-type":"application/json","x-api-key":settings.apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:settings.model||"claude-haiku-5-5",max_tokens:500,system,messages:[...chatHistory.slice(-10),{role:"user",content:text}]})
+  });
+  if(!res.ok) throw new Error("API "+res.status+": "+(await res.text()));
+  const j = await res.json();
+  const raw = (j.content||[]).map(c=>c.text||"").join("").trim();
+  const m = raw.match(/HIGHLIGHT:\s*(.*)\s*$/i);
+  const ids = m ? m[1].split(",").map(s=>s.trim()).filter(id=>byId(id)) : [];
+  if(/SHOW_EXITS/.test(raw)) setSafety(true);
+  return {text: raw.replace(/HIGHLIGHT:.*$/is,"").replace(/SHOW_EXITS/g,"").trim(), ids};
+}
+
+/* ---- Text to speech ---- */
+function speak(text){
+  if(!settings.speak || !("speechSynthesis" in window)) return;
+  stopSpeaking();
+  const u = new SpeechSynthesisUtterance(text.replace(/\(Offline mode\)\s*/,""));
+  const v = speechSynthesis.getVoices().find(v=>v.name===settings.voice)
+         || speechSynthesis.getVoices().find(v=>/en-US/.test(v.lang) && /(Natural|Aria|Jenny|Google US|Samantha)/i.test(v.name));
+  if(v) u.voice=v;
+  u.rate = settings.rate || 1;
+  u.onstart=()=>$("#avatar").classList.add("talking");
+  u.onend=u.onerror=()=>$("#avatar").classList.remove("talking");
+  speechSynthesis.speak(u);
+}
+function stopSpeaking(){ if("speechSynthesis" in window) speechSynthesis.cancel(); $("#avatar").classList.remove("talking"); }
+speechSynthesis.onvoiceschanged = ()=>{};
+
+const voiceSw = $("#voiceSw");
+voiceSw.classList.toggle("on", settings.speak);
+voiceSw.onclick=()=>{ settings.speak=!settings.speak; voiceSw.classList.toggle("on",settings.speak); if(!settings.speak) stopSpeaking(); saveSettings(); };
+
+/* ---- Speech to text ---- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec=null, listening=false, finalText="";
+if(SR){
+  rec = new SR(); rec.lang="en-US"; rec.interimResults=true; rec.continuous=false;
+  rec.onresult = e=>{
+    let interim=""; finalText="";
+    for(const r of e.results){ (r.isFinal ? (finalText+=r[0].transcript) : (interim+=r[0].transcript)); }
+    $("#textIn").value = finalText || interim;
+  };
+  rec.onend = ()=>{ listening=false; $("#micBtn").classList.remove("live"); $("#micStatus").textContent=""; const t=finalText || $("#textIn").value; finalText=""; if(t) sendText(t); };
+  rec.onerror = e=>{ $("#micStatus").textContent = e.error==="not-allowed" ? "Microphone blocked" : ""; };
+}
+$("#micBtn").onclick=()=>{
+  if(!rec){ toast("Voice input needs Chrome or Edge"); $("#textIn").focus(); return; }
+  if(listening){ rec.stop(); return; }
+  stopSpeaking(); finalText=""; $("#textIn").value="";
+  try{ rec.start(); listening=true; $("#micBtn").classList.add("live"); $("#micStatus").textContent="Listening…"; }catch(e){}
+};
+$("#sendBtn").onclick=()=>sendText($("#textIn").value);
+$("#textIn").addEventListener("keydown",e=>{ if(e.key==="Enter") sendText($("#textIn").value); });
+
+/* =========================================================
+   KIOSK: idle reset + boot
+   ========================================================= */
+function resetKiosk(){ closeSheet(); stopSpeaking(); setSafety(false); activeCat=null; highlight([]); renderChips(); resetChat(); }
+$("#resetViewBtn").onclick = resetKiosk;
+let idleT; function poke(){ clearTimeout(idleT); if(settings.idleSec>0 && !editing) idleT=setTimeout(resetKiosk, settings.idleSec*1000); }
+["pointerdown","keydown"].forEach(ev=>document.addEventListener(ev,poke));
+window.addEventListener("resize", fitStage);
+new ResizeObserver(fitStage).observe($("#mapWrap"));
+
+renderChips(); renderStage(); resetChat(); updateMode(); poke();
+</script>
+</body>
+</html>
