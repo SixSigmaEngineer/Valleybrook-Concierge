@@ -37,10 +37,19 @@ main{display:grid;grid-template-columns:minmax(0,1fr) 440px;min-height:0;min-wid
 .chips{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
 .chip{padding:12px 18px;border-radius:999px;background:var(--navy-2);border:2px solid var(--navy-3);font-weight:600;font-size:16px}
 .chip.on{background:var(--gold);color:var(--navy);border-color:var(--gold)}
-.map-wrap{flex:1;min-height:0;display:grid;place-items:center;position:relative}
+.map-wrap{flex:1;min-height:0;display:grid;place-items:center;position:relative;overflow:hidden;touch-action:none;border-radius:var(--radius)}
+.map-wrap.zoomed{cursor:grab}.map-wrap.panning{cursor:grabbing}
+.stage.anim{transition:transform .3s ease}
+.zoom-ctl{position:absolute;right:14px;bottom:14px;z-index:10;display:flex;flex-direction:column;gap:8px}
+.zoom-ctl button{width:58px;height:58px;border-radius:16px;background:var(--navy);color:#fff;border:2px solid rgba(255,255,255,.25);font-size:30px;font-weight:700;line-height:1;box-shadow:0 6px 16px rgba(0,0,0,.35);display:grid;place-items:center}
+.zoom-ctl button:active{transform:scale(.94)}
+.zoom-ctl button:disabled{opacity:.45}
+.zoom-ctl #zoomFit{font-size:15px}
+.zoom-level{position:absolute;left:14px;bottom:14px;z-index:10;background:rgba(4,30,66,.8);color:#fff;font-weight:700;font-size:14px;padding:6px 12px;border-radius:999px;pointer-events:none;opacity:0;transition:opacity .3s}
+.map-wrap.zoomed .zoom-level{opacity:1}
 .stage{position:relative;border-radius:var(--radius);overflow:visible;background:var(--paper);box-shadow:0 20px 50px rgba(0,0,0,.35)}
 .stage > .plan{position:absolute;inset:0;width:100%;height:100%;border-radius:var(--radius);object-fit:fill;pointer-events:none}
-.bubble{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;z-index:2;touch-action:none}
+.bubble{position:absolute;transform:translate(-50%,-50%) scale(var(--iz,1));display:flex;flex-direction:column;align-items:center;gap:2px;z-index:2;touch-action:none}
 .bubble .dot{width:var(--bs,62px);height:var(--bs,62px);border-radius:50%;background:#fff;border:3px solid var(--navy);display:grid;place-items:center;font-size:calc(var(--bs,62px)*.5);box-shadow:0 3px 8px rgba(4,30,66,.35);transition:transform .15s}
 .bubble .lbl{background:var(--navy);color:#fff;font-weight:600;font-size:11px;line-height:1.2;padding:2px 6px;border-radius:999px;white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis}
 .bubble:active .dot{transform:scale(.92)}
@@ -48,14 +57,14 @@ main{display:grid;grid-template-columns:minmax(0,1fr) 440px;min-height:0;min-wid
 .bubble.hl .dot{border-color:var(--gold);animation:pulse 1.4s infinite;transform:scale(1.12)}
 .bubble.hl .lbl{background:var(--gold);color:var(--navy)}
 .bubble.hl{z-index:5}
-.stage.compact .bubble:not(.hl) .lbl{display:none}
+.stage.compact:not(.zoomed) .bubble:not(.hl) .lbl{display:none}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,199,44,.85)}70%{box-shadow:0 0 0 26px rgba(255,199,44,0)}100%{box-shadow:0 0 0 0 rgba(255,199,44,0)}}
 body.editing .bubble .dot{border-style:dashed;cursor:grab}
 .viewtabs{display:flex;background:var(--navy-2);border:2px solid var(--navy-3);border-radius:999px;padding:4px;margin-bottom:12px;align-self:flex-start}
 .viewtabs button{padding:10px 20px;border-radius:999px;font-weight:700;font-size:16px;color:var(--muted)}
 .viewtabs button.on{background:#fff;color:var(--navy)}
 .map-hint{margin-left:auto;align-self:center;font-size:15px;color:var(--muted)}
-.youarehere{position:absolute;transform:translate(-50%,-50%);z-index:1;pointer-events:none}
+.youarehere{position:absolute;transform:translate(-50%,-50%) scale(var(--iz,1));z-index:1;pointer-events:none}
 .youarehere span{display:block;background:#E5484D;color:#fff;font-weight:700;font-size:12px;padding:4px 8px;border-radius:8px;white-space:nowrap}
 
 /* ---------- Chat ---------- */
@@ -160,6 +169,8 @@ body.editing .bubble .dot{border-style:dashed;cursor:grab}
       <div style="display:flex;gap:12px;align-items:flex-start"><div class="chips" id="chips"></div><span class="map-hint" id="mapHint">Tap a bubble to learn more</span></div>
       <div class="map-wrap" id="mapWrap">
         <div class="stage" id="stage"></div>
+        <div class="zoom-ctl"><button id="zoomIn" aria-label="Zoom in">＋</button><button id="zoomOut" aria-label="Zoom out">−</button><button id="zoomFit" aria-label="Show whole map">Fit</button></div>
+        <span class="zoom-level" id="zoomLevel"></span>
       </div>
     </section>
 
@@ -313,17 +324,97 @@ let editing = false, activeCat = null, highlighted = new Set();
 /* Valleybrook floor plans (ETSU Office of Planning, Design and Construction drawings).
    Images live in the maps/ folder next to index.html. Bubbles use map:"<id>" to pick a sheet. */
 const MAPS = [
+  {id:"v3",       tab:"F1 Workshop", img:"maps/v3.svg",             aspect:2000/1294, alt:"F1 Workshop floor plan (Building V3)"},
   {id:"v2-lower", tab:"F1",          img:"maps/v2-lower-level.png", aspect:3400/2200, alt:"F1 floor plan (Building V2 lower level)"},
-  {id:"v3",       tab:"F1 Workshop", img:"maps/v3.png",             aspect:3400/2200, alt:"F1 Workshop floor plan (Building V3)"},
   {id:"v2-upper", tab:"F2",          img:"maps/v2-upper-level.png", aspect:3400/2200, alt:"F2 floor plan (Building V2 upper level)"}
 ];
 const DEFAULT_MAP = MAPS[0].id;
 const mapById = id => MAPS.find(m=>m.id===id) || MAPS[0];
 let view = DEFAULT_MAP;
 MAPS.forEach(m=>{ const b=el("button",{textContent:m.tab,className:m.id===view?"on":""}); b.dataset.v=m.id; $("#viewTabs").append(b); });
-function setView(v){ if(view===v) return; view=v; $("#viewTabs").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===v)); renderStage(); }
+function setView(v){ if(view===v) return; view=v; zs.z=1; zs.tx=0; zs.ty=0; $("#viewTabs").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===v)); renderStage(); }
 $("#viewTabs").addEventListener("click", e=>{ const b=e.target.closest("button"); if(b) setView(b.dataset.v); });
 const onView = r => mapById(r.map).id===view;
+
+/* ---------- Zoom & pan ----------
+   The stage keeps its fitted size; zoom is a CSS transform on top of it, so bubble
+   positions (percentages) and drag-to-move in edit mode keep working unchanged.
+   Bubbles are counter-scaled (--iz) so they stay the same size on screen. */
+const ZMAX = 5;
+const zs = { z:1, tx:0, ty:0 };
+let panMoved = false;
+function applyZoom(animate){
+  const st=$("#stage"), wrap=$("#mapWrap");
+  const w=st.offsetWidth, h=st.offsetHeight, W=wrap.clientWidth, H=wrap.clientHeight;
+  zs.z=Math.max(1,Math.min(ZMAX,zs.z));
+  // keep the map covering the frame (or centred when it is smaller than the frame)
+  const mx=Math.max(0,(w*zs.z-W)/2), my=Math.max(0,(h*zs.z-H)/2);
+  zs.tx=Math.max(-mx,Math.min(mx,zs.tx)); zs.ty=Math.max(-my,Math.min(my,zs.ty));
+  if(zs.z===1){ zs.tx=0; zs.ty=0; }
+  st.classList.toggle("anim",!!animate);
+  st.style.transform=`translate(${zs.tx}px,${zs.ty}px) scale(${zs.z})`;
+  st.style.setProperty("--iz",1/zs.z);
+  const zoomed=zs.z>1.01;
+  st.classList.toggle("zoomed",zs.z>=1.6); wrap.classList.toggle("zoomed",zoomed);
+  $("#zoomLevel").textContent=`${Math.round(zs.z*100)}% · drag to move`;
+  $("#zoomIn").disabled=zs.z>=ZMAX-0.01; $("#zoomOut").disabled=!zoomed; $("#zoomFit").disabled=!zoomed;
+}
+// zoom to z, keeping the screen point (sx,sy) fixed; default = centre of the map frame
+function zoomAt(z,sx,sy,animate){
+  const wrap=$("#mapWrap").getBoundingClientRect();
+  const cx=wrap.left+wrap.width/2, cy=wrap.top+wrap.height/2;
+  if(sx==null){ sx=cx; sy=cy; }
+  const nz=Math.max(1,Math.min(ZMAX,z));
+  const ux=(sx-cx-zs.tx)/zs.z, uy=(sy-cy-zs.ty)/zs.z;
+  zs.tx=sx-cx-nz*ux; zs.ty=sy-cy-nz*uy; zs.z=nz; applyZoom(animate);
+}
+function resetZoom(animate){ zs.z=1; zs.tx=0; zs.ty=0; applyZoom(animate); }
+// centre the map on a spot given in % of the map, at zoom z
+function zoomTo(xPct,yPct,z,animate=true){
+  const st=$("#stage"), w=st.offsetWidth, h=st.offsetHeight;
+  zs.z=Math.max(zs.z,z);
+  zs.tx=-(xPct/100-0.5)*w*zs.z; zs.ty=-(yPct/100-0.5)*h*zs.z; applyZoom(animate);
+}
+$("#zoomIn").onclick =()=>zoomAt(zs.z*1.6,null,null,true);
+$("#zoomOut").onclick=()=>zoomAt(zs.z/1.6,null,null,true);
+$("#zoomFit").onclick=()=>resetZoom(true);
+(function(){
+  const wrap=$("#mapWrap"), pts=new Map(); let last=null, lastTap=0, downAt=null;
+  wrap.addEventListener("wheel",e=>{ e.preventDefault(); zoomAt(zs.z*Math.exp(-e.deltaY*0.0015),e.clientX,e.clientY,false); },{passive:false});
+  wrap.addEventListener("pointerdown",e=>{
+    if(e.target.closest(".zoom-ctl")) return;
+    if(editing && e.target.closest(".bubble")) return;          // dragging a bubble, not the map
+    pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pts.size===1){ panMoved=false; downAt={x:e.clientX,y:e.clientY}; }
+    last=null;
+  });
+  wrap.addEventListener("pointermove",e=>{
+    if(!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    const p=[...pts.values()];
+    if(p.length===1){
+      if(downAt && Math.hypot(e.clientX-downAt.x,e.clientY-downAt.y)>8) panMoved=true;
+      if(!panMoved || zs.z<=1.01) return;
+      wrap.classList.add("panning");
+      if(last){ zs.tx+=e.clientX-last.x; zs.ty+=e.clientY-last.y; applyZoom(false); }
+      last={x:e.clientX,y:e.clientY,d:0};
+    } else {
+      panMoved=true;
+      const mx=(p[0].x+p[1].x)/2, my=(p[0].y+p[1].y)/2, d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);
+      if(last && last.d){ zs.tx+=mx-last.x; zs.ty+=my-last.y; zoomAt(zs.z*d/last.d,mx,my,false); }
+      last={x:mx,y:my,d};
+    }
+  });
+  const up=e=>{
+    if(!pts.has(e.pointerId)) return;
+    pts.delete(e.pointerId); last=null; wrap.classList.remove("panning");
+    if(pts.size===0 && !panMoved && !e.target.closest(".bubble")){
+      const now=Date.now();
+      if(now-lastTap<320){ zoomAt(zs.z<2.5?zs.z*2:1,e.clientX,e.clientY,true); lastTap=0; } else lastTap=now;
+    }
+  };
+  wrap.addEventListener("pointerup",up); wrap.addEventListener("pointercancel",up);
+})();
 
 function renderChips(){
   const c = $("#chips"); c.innerHTML = "";
@@ -344,6 +435,7 @@ function fitStage(){
   st.style.width = w+"px"; st.style.height = h+"px";
   st.classList.toggle("compact", Math.min(w,h) < 560);
   st.style.setProperty("--bs", Math.max(24, Math.min(34, Math.min(w,h)/28))+"px");
+  applyZoom(false);
 }
 
 function renderStage(){
@@ -389,15 +481,26 @@ function attachBubbleEvents(b, r){
     b.style.left=r.x+"%"; b.style.top=r.y+"%";
   });
   b.addEventListener("pointerup", ()=>{ if(editing && moved){ r.x=+r.x.toFixed(1); r.y=+r.y.toFixed(1); save(); } start=null; });
-  b.addEventListener("click", ()=>{ if(moved){ moved=false; return; } editing ? openEditor(r) : openDetail(r); });
+  b.addEventListener("click", ()=>{ if(moved){ moved=false; return; } if(panMoved && !editing){ panMoved=false; return; } editing ? openEditor(r) : openDetail(r); });
 }
 
 function highlight(ids){
   highlighted = new Set(ids||[]);
   if(ids && ids.length) activeCat = null, renderChips();
   const rs=(ids||[]).map(byId).filter(Boolean);
-  if(rs.length && !rs.some(onView)){ view=""; setView(mapById(rs[0].map).id); return; }
+  if(rs.length && !rs.some(onView)){ view=""; setView(mapById(rs[0].map).id); focusOn(rs.filter(onView)); return; }
   renderBubbles();
+  focusOn(rs.filter(onView));
+}
+// zoom in so highlighted bubbles fill the view (one spot: close up; several: fit them all)
+function focusOn(rs){
+  if(!rs.length || editing) return;
+  const xs=rs.map(r=>r.x), ys=rs.map(r=>r.y);
+  const x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
+  const st=$("#stage"), wrap=$("#mapWrap"), w=st.offsetWidth, h=st.offsetHeight;
+  const spanX=Math.max(12,(x1-x0)+12)/100*w, spanY=Math.max(12,(y1-y0)+12)/100*h;
+  const z=Math.min(3, wrap.clientWidth/spanX, wrap.clientHeight/spanY);
+  zs.z=1; zoomTo((x0+x1)/2,(y0+y1)/2,Math.max(1,z));
 }
 
 /* =========================================================
@@ -749,7 +852,7 @@ $("#textIn").addEventListener("keydown",e=>{ if(e.key==="Enter") sendText($("#te
 /* =========================================================
    KIOSK: idle reset + boot
    ========================================================= */
-function resetKiosk(){ setView(DEFAULT_MAP); closeSheet(); stopSpeaking(); setSafety(false); activeCat=null; highlight([]); renderChips(); resetChat(); }
+function resetKiosk(){ setView(DEFAULT_MAP); resetZoom(true); closeSheet(); stopSpeaking(); setSafety(false); activeCat=null; highlight([]); renderChips(); resetChat(); }
 $("#resetViewBtn").onclick = resetKiosk;
 let idleT; function poke(){ clearTimeout(idleT); if(settings.idleSec>0 && !editing) idleT=setTimeout(resetKiosk, settings.idleSec*1000); }
 ["pointerdown","keydown"].forEach(ev=>document.addEventListener(ev,poke));

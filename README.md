@@ -2,7 +2,7 @@
 
 A touchscreen kiosk app for the Project EARTH workshop at ETSU's Eastman Valleybrook campus (Building V2, Lower Level).
 
-- **Interactive floor plans.** Three ETSU floor plan sheets (F1, F1 Workshop, F2), each on its own tab, with tappable bubbles for tools and resources.
+- **Interactive floor plans.** Three floor plans (F1 Workshop, F1, F2), each on its own tab. F1 Workshop opens first and is a clean redraw of the ETSU sheet (`maps/v3.svg`). Each tab has with tappable bubbles for tools and resources.
 - **Voice concierge.** Tap the mic and ask where something is. It answers out loud and highlights the spot on the map. It works offline with keyword matching, or with Claude if you add an Anthropic API key in ⚙︎ Settings.
 - **Knowledge base.** Includes emergency procedures, exits and facilities contacts. You can edit it in ⚙︎ Settings → 📚 Knowledge base.
 - **🚨 Emergency button.** Shows emergency phone numbers and step-by-step procedures.
