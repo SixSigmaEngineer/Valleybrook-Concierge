@@ -171,6 +171,13 @@ body.editing .bubble .dot{border-style:dashed;cursor:grab}
 .feed .screen.switching img{animation:camblur .38s ease-out}
 @keyframes camstatic{0%{opacity:1;background-position:0 0}50%{opacity:.85;background-position:0 23px}100%{opacity:0;background-position:0 41px}}
 @keyframes camblur{0%{filter:brightness(1.8) contrast(.4) blur(3px)}100%{filter:saturate(.85) contrast(1.05)}}
+.feed .screen .dark{position:absolute;inset:0;background:#000}
+.jumpscare{position:fixed;inset:0;z-index:200;background:#000;display:grid;place-items:center;overflow:hidden;animation:jsflash .12s steps(2) 6}
+.jumpscare img{width:min(96vw,150vh);height:auto;image-rendering:pixelated;animation:jszoom .5s cubic-bezier(.2,1.6,.4,1) forwards, jsshake .07s linear infinite .1s}
+.jumpscare::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.35) 0 2px,transparent 2px 4px)}
+@keyframes jszoom{0%{transform:scale(.25);filter:brightness(3)}100%{transform:scale(1.15);filter:brightness(1.1) contrast(1.3)}}
+@keyframes jsshake{0%{translate:0 0}25%{translate:-14px 9px}50%{translate:12px -11px}75%{translate:-9px -7px}100%{translate:10px 12px}}
+@keyframes jsflash{50%{background:#fff}}
 .feed .bar{display:flex;gap:10px;align-items:center;padding:14px 18px;flex-wrap:wrap}
 .feed .bar .t{margin-right:auto;font:700 22px 'Barlow Condensed','Arial Narrow',sans-serif}
 .feed .bar .t small{display:block;font:500 13px system-ui,sans-serif;color:#9FB0CC}
@@ -521,7 +528,8 @@ const CAMS = [
   {n:16, x:17.7, y:49.5, dir:180, where:"Public Health Warehouse, south wall"},
   {n:13, x:14.3, y:50.2, dir:180, where:"Public Health Warehouse, south wall"},
   {n:14, x:15.8, y:40.3, dir:0,   where:"Public Health Warehouse, north wall"},
-  {n:15, x:12.4, y:40.3, dir:0,   where:"Public Health Warehouse, north wall"}
+  {n:15, x:12.4, y:40.3, dir:0,   where:"Public Health Warehouse, north wall"},
+  {n:21, x:4.9,  y:14.3, dir:135, where:"Public Health Warehouse, northwest corner", dark:true}
 ].map(c=>Object.assign(c,{map:"v3", img:"Photos/cameras/cam-"+c.n+".jpg"}));
 const CAM_ORDER = CAMS.slice().sort((a,b)=>a.n-b.n);
 const CAM_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M3 8.6 15.4 5.2l1.9 6.2L4.9 14.8z" fill="#fff"/><path d="M17.6 8.4l3.4-1v4l-3.1.9"/><path d="M8.2 13.9V19H3.5"/></svg>';
@@ -566,7 +574,45 @@ function camSound(){
     n.connect(bp).connect(hp).connect(g).connect(out); n.start(t+.04); n.stop(t+.04+len);
   }catch(e){}
 }
+/* Camera 21 never shows a picture. Leave its feed open for 20 seconds and... */
+let jumpT = null;
+function screamSound(){
+  try{
+    camAudio = camAudio || new (window.AudioContext||window.webkitAudioContext)();
+    const ac = camAudio; if(ac.state==="suspended") ac.resume();
+    const t = ac.currentTime, dur = 1.5, out = ac.createGain();
+    out.gain.setValueAtTime(.0001, t); out.gain.exponentialRampToValueAtTime(.9, t+.02);
+    out.gain.setValueAtTime(.9, t+dur-.35); out.gain.exponentialRampToValueAtTime(.0001, t+dur);
+    const drive = ac.createWaveShaper(), curve = new Float32Array(1024);
+    for(let i=0;i<1024;i++){ const x=i/512-1; curve[i]=Math.tanh(x*6); } drive.curve = curve;
+    drive.connect(out); out.connect(ac.destination);
+    // screeching voices, slightly detuned, with a fast warble
+    [420, 433, 611, 880].forEach((f,i)=>{
+      const o = ac.createOscillator(), g = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();
+      o.type = i%2 ? "square" : "sawtooth";
+      o.frequency.setValueAtTime(f*.7, t); o.frequency.exponentialRampToValueAtTime(f*1.35, t+.25); o.frequency.exponentialRampToValueAtTime(f*1.05, t+dur);
+      lfo.frequency.value = 17 + i*3; lg.gain.value = f*.06; lfo.connect(lg).connect(o.frequency);
+      g.gain.value = .22; o.connect(g).connect(drive);
+      o.start(t); lfo.start(t); o.stop(t+dur); lfo.stop(t+dur);
+    });
+    // harsh noise layer
+    const buf = ac.createBuffer(1, Math.ceil(ac.sampleRate*dur), ac.sampleRate), ch = buf.getChannelData(0);
+    for(let i=0;i<ch.length;i++) ch[i] = Math.random()*2-1;
+    const n = ac.createBufferSource(), ng = ac.createGain(), bp = ac.createBiquadFilter();
+    n.buffer = buf; bp.type = "bandpass"; bp.frequency.value = 2500; bp.Q.value = .5; ng.gain.value = .5;
+    n.connect(bp).connect(ng).connect(drive); n.start(t); n.stop(t+dur);
+  }catch(e){}
+}
+function jumpscare(){
+  jumpT = null;
+  if(camOn!==21 || !$("#scrim").classList.contains("open")) return;
+  screamSound();
+  const js = el("div",{className:"jumpscare"}, el("img",{src:"Photos/cameras/cdc-jumpscare.png", alt:""}));
+  document.body.append(js);
+  setTimeout(()=>{ js.remove(); closeSheet(); }, 1600);
+}
 function openCamFeed(c){
+  clearTimeout(jumpT); jumpT = null;
   camSound();
   camOn = c.n; renderCams();
   const pad = n => String(n).padStart(2,"0");
@@ -574,7 +620,7 @@ function openCamFeed(c){
   const tick = ()=>{ const d=new Date(); clock.textContent = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}  ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
   tick(); clearInterval(camClock); camClock = setInterval(()=>{ if(!document.body.contains(clock)){ clearInterval(camClock); return; } tick(); }, 1000);
   const screen = el("div",{className:"screen"},
-    el("img",{src:c.img, alt:"Camera "+c.n+" view: "+c.where}),
+    c.dark ? el("div",{className:"dark"}) : el("img",{src:c.img, alt:"Camera "+c.n+" view: "+c.where}),
     el("div",{className:"static"}),
     el("div",{className:"osd tl",innerHTML:'<span class="r">●</span> REC &nbsp;CAM '+pad(c.n)}),
     clock,
@@ -588,6 +634,7 @@ function openCamFeed(c){
   const bar = el("div",{className:"bar"}, el("div",{className:"t",innerHTML:"Camera "+c.n+"<small>"+esc(c.where)+" · looking "+COMPASS(c.dir)+"</small>"}), prev, next, close);
   openSheet(el("div",{className:"feed"}, screen, bar));
   requestAnimationFrame(()=>screen.classList.add("switching"));
+  if(c.dark) jumpT = setTimeout(jumpscare, 20000);
 }
 
 function attachBubbleEvents(b, r){
@@ -632,7 +679,7 @@ function focusOn(rs){
    DETAIL / EDITOR SHEETS
    ========================================================= */
 function openSheet(node){ const s=$("#sheet"); s.innerHTML=""; s.append(node); $("#scrim").classList.add("open"); }
-function closeSheet(){ $("#scrim").classList.remove("open"); if(camOn!==null){ camOn=null; renderCams(); } }
+function closeSheet(){ $("#scrim").classList.remove("open"); clearTimeout(jumpT); jumpT=null; if(camOn!==null){ camOn=null; renderCams(); } }
 $("#scrim").addEventListener("click", e=>{ if(e.target.id==="scrim") closeSheet(); });
 
 function openDetail(r){
