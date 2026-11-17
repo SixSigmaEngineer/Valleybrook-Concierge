@@ -145,6 +145,36 @@ body.editing .bubble .dot{border-style:dashed;cursor:grab}
 .kb-item{display:flex;gap:10px;align-items:center;justify-content:space-between;border:2px solid #E3E8F0;border-radius:12px;padding:10px 14px}
 .kb-item b{font-size:16px}.kb-item small{color:#5b6b84}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--gold);color:var(--navy);padding:12px 20px;border-radius:999px;font-weight:700;z-index:99;display:none}
+
+/* ---------- Security cameras (F1 Workshop photo spots) ---------- */
+.cam{position:absolute;transform:translate(-50%,-50%) scale(var(--iz,1));z-index:3;touch-action:none;width:calc(var(--bs,62px)*.62);height:calc(var(--bs,62px)*.62)}
+.cam .cone{position:absolute;left:50%;top:50%;width:calc(var(--bs,62px)*2.3);height:calc(var(--bs,62px)*2.3);transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;
+  background:conic-gradient(from calc(var(--dir,0deg) - 28deg), rgba(229,72,77,.55) 0 56deg, transparent 0);
+  -webkit-mask:radial-gradient(circle, #000 12%, rgba(0,0,0,.6) 34%, transparent 70%);mask:radial-gradient(circle, #000 12%, rgba(0,0,0,.6) 34%, transparent 70%)}
+.cam .cdot{position:absolute;inset:0;border-radius:50%;background:#0B1F3A;border:2px solid #fff;display:grid;place-items:center;box-shadow:0 2px 6px rgba(4,30,66,.45);transition:transform .15s}
+.cam .cdot svg{width:62%;height:62%}
+.cam .cdot::after{content:"";position:absolute;top:8%;right:8%;width:22%;height:22%;border-radius:50%;background:#E5484D;animation:rec 1.6s infinite}
+.cam:active .cdot{transform:scale(.9)}
+.cam .cnum{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:2px;background:#0B1F3A;color:#fff;font:700 9px/1 system-ui,sans-serif;padding:2px 4px;border-radius:5px;white-space:nowrap;pointer-events:none}
+.stage.compact:not(.zoomed) .cam .cnum{display:none}
+.cam.on .cdot{border-color:var(--gold);transform:scale(1.25)}
+@keyframes rec{50%{opacity:.25}}
+.feed{background:#05070B;color:#E8F0FF;border-radius:24px;overflow:hidden}
+.feed .screen{position:relative;background:#000;aspect-ratio:4/3;max-height:70vh;margin:0 auto}
+.feed .screen img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;filter:saturate(.85) contrast(1.05)}
+.feed .screen::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px);box-shadow:inset 0 0 90px rgba(0,0,0,.55)}
+.feed .osd{position:absolute;z-index:2;font:700 15px/1 ui-monospace,Consolas,monospace;color:#fff;text-shadow:0 1px 3px #000;letter-spacing:.5px}
+.feed .osd.tl{top:14px;left:16px}.feed .osd.tr{top:14px;right:16px}.feed .osd.bl{bottom:14px;left:16px;font-size:13px;font-weight:600}
+.feed .osd .r{color:#FF4D4F;animation:rec 1.2s infinite}
+.feed .screen .static{position:absolute;inset:0;z-index:1;pointer-events:none;opacity:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.5) 0 1px,rgba(0,0,0,.6) 1px 2px,rgba(180,180,180,.35) 2px 4px);background-size:100% 7px}
+.feed .screen.switching .static{animation:camstatic .38s steps(6) forwards}
+.feed .screen.switching img{animation:camblur .38s ease-out}
+@keyframes camstatic{0%{opacity:1;background-position:0 0}50%{opacity:.85;background-position:0 23px}100%{opacity:0;background-position:0 41px}}
+@keyframes camblur{0%{filter:brightness(1.8) contrast(.4) blur(3px)}100%{filter:saturate(.85) contrast(1.05)}}
+.feed .bar{display:flex;gap:10px;align-items:center;padding:14px 18px;flex-wrap:wrap}
+.feed .bar .t{margin-right:auto;font:700 22px 'Barlow Condensed','Arial Narrow',sans-serif}
+.feed .bar .t small{display:block;font:500 13px system-ui,sans-serif;color:#9FB0CC}
+.feed .btn{background:#1A2A44;color:#fff}
 </style>
 </head>
 <body>
@@ -257,13 +287,11 @@ const SAMPLE = {
     {"id": "f1-shared", "name": "Shared Area", "emoji": "🤝", "category": "Departments & Labs", "map": "v2-lower", "x": 32.3, "y": 63.5, "location": "F1 floor, Building V2 lower level", "summary": "", "details": "", "safety": "", "tags": ["shared area", "shared"], "sample": false},
     {"id": "f1-animal", "name": "Animal Holding", "emoji": "🐾", "category": "Departments & Labs", "map": "v2-lower", "x": 71.9, "y": 44.8, "location": "F1 floor, Building V2 lower level", "summary": "", "details": "", "safety": "", "tags": ["animal holding", "animals"], "sample": false},
     {"id": "f1-mech", "name": "Facilities", "emoji": "⚙️", "category": "Facilities", "map": "v2-lower", "x": 65.5, "y": 74.1, "location": "F1 floor, Building V2 lower level", "summary": "", "details": "", "safety": "", "tags": ["facilities", "mechanical", "boiler", "generator", "facilities / mechanical"], "sample": false},
-    {"id": "w-art", "name": "Art Studios", "emoji": "🎨", "category": "Departments & Labs", "map": "v3", "x": 15.7, "y": 45, "location": "F1 Workshop, Building V3", "summary": "", "details": "", "safety": "", "tags": ["art studio", "art studios", "art"], "sample": false},
+    {"id": "w-art", "name": "Public Health Warehouse", "emoji": "🩺", "category": "Departments & Labs", "map": "v3", "x": 15.7, "y": 45, "location": "F1 Workshop, Building V3", "summary": "", "details": "", "safety": "", "tags": ["public health", "warehouse"], "sample": false},
     {"id": "w-ph-n", "name": "Public Health Warehouse", "emoji": "🩺", "category": "Departments & Labs", "map": "v3", "x": 29.4, "y": 19.5, "location": "F1 Workshop, Building V3", "summary": "", "details": "", "safety": "", "tags": ["public health", "warehouse"], "sample": false},
     {"id": "w-tool", "name": "Tool Room", "emoji": "🔧", "category": "Facilities", "map": "v3", "x": 33.7, "y": 39.5, "location": "F1 Workshop, Building V3", "summary": "", "details": "", "safety": "", "tags": ["tool room", "tools", "tool"], "sample": false},
     {"id": "w-ph", "name": "Public Health", "emoji": "🩺", "category": "Departments & Labs", "map": "v3", "x": 44.3, "y": 43.6, "location": "F1 Workshop, Building V3", "summary": "", "details": "", "safety": "", "tags": ["public health"], "sample": false},
     {"id": "w-shop", "name": "Facilities Shop", "emoji": "🛠️", "category": "Facilities", "map": "v3", "x": 59.1, "y": 44.5, "location": "F1 Workshop, Building V3", "summary": "", "details": "", "safety": "", "tags": ["facilities shop", "shop", "garage"], "sample": false},
-    {"id": "w-ph-e", "name": "Public Health", "emoji": "🩺", "category": "Departments & Labs", "map": "v3", "x": 71, "y": 45, "location": "F1 Workshop, Building V3", "summary": "", "details": "", "safety": "", "tags": ["public health"], "sample": false},
-    {"id": "w-canteen", "name": "Canteen", "emoji": "☕", "category": "Amenities", "map": "v3", "x": 57.5, "y": 55.9, "location": "F1 Workshop, Building V3", "summary": "", "details": "", "safety": "", "tags": ["canteen", "break room", "snack"], "sample": false},
     {"id": "w-mech", "name": "Facilities", "emoji": "⚙️", "category": "Facilities", "map": "v3", "x": 33.8, "y": 17, "location": "F1 Workshop, Building V3", "summary": "", "details": "", "safety": "", "tags": ["facilities", "mechanical", "facilities / mechanical"], "sample": false},
     {"id": "f2-cofam", "name": "Community Outreach", "emoji": "🏡", "category": "Departments & Labs", "map": "v2-upper", "x": 25.4, "y": 51, "location": "F2 floor, Building V2 upper level", "summary": "", "details": "", "safety": "", "tags": ["community outreach", "nurse family", "nurse-family", "community outreach / nurse-family"], "sample": false},
     {"id": "f2-bt", "name": "Business & Tech", "emoji": "💼", "category": "Departments & Labs", "map": "v2-upper", "x": 30.6, "y": 55.5, "location": "F2 floor, Building V2 upper level", "summary": "", "details": "", "safety": "", "tags": ["business", "technology", "business & technology"], "sample": false},
@@ -308,6 +336,10 @@ SAMPLE.kb.forEach(k=>{ if(!data.kbSeeded.includes(k.id)){ data.kbSeeded.push(k.i
 if(!data.resSeeded) data.resSeeded = data.resources.map(r=>r.id);
 SAMPLE.resources.forEach(r=>{ if(!data.resSeeded.includes(r.id)){ data.resSeeded.push(r.id); if(!data.resources.some(x=>x.id===r.id)) data.resources.push(clone(r)); } });
 SAMPLE.categories.forEach(c=>{ if(!data.categories.includes(c)) data.categories.push(c); });
+// retired pins (no longer accessible / no canteen) and the Art Studios -> Public Health Warehouse rename
+const RETIRED = ["w-ph-e","w-canteen"];
+if(data.resources.some(r=>RETIRED.includes(r.id))){ data.resources = data.resources.filter(r=>!RETIRED.includes(r.id)); try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){} }
+(()=>{ const a=data.resources.find(r=>r.id==="w-art"); if(a && a.name==="Art Studios"){ const s=SAMPLE.resources.find(r=>r.id==="w-art"); a.name=s.name; a.emoji=s.emoji; a.tags=clone(s.tags); try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){} } })();
 let settings = Object.assign({apiKey:"", model:"claude-haiku-5-5", voice:"", rate:1, speak:true, idleSec:180}, load(SKEY, {}));
 
 /* ---------- Helpers ---------- */
@@ -463,6 +495,99 @@ function renderBubbles(){
     attachBubbleEvents(b, r);
     st.append(b);
   });
+  renderCams();
+}
+
+/* ---------- Security cameras ----------
+   Photo spots on the F1 Workshop map. x/y are % of the plan; dir is the way the
+   photo faces (0 = up/north, 90 = right/east, 180 = down/south, 270 = left/west). */
+const CAMS = [
+  {n:1,  x:61.0, y:70.8, dir:0,   where:"South corridor, by the entrance"},
+  {n:2,  x:60.2, y:57.8, dir:180, where:"South corridor"},
+  {n:3,  x:61.0, y:53.2, dir:90,  where:"Top of the south corridor"},
+  {n:4,  x:59.2, y:49.5, dir:315, where:"Facilities Shop"},
+  {n:5,  x:64.4, y:44.7, dir:90,  where:"Facilities Shop, east side"},
+  {n:6,  x:52.0, y:43.7, dir:270, where:"Public Health, east doorway"},
+  {n:7,  x:50.3, y:40.5, dir:270, where:"Public Health, east end"},
+  {n:20, x:52.2, y:40.5, dir:0,   where:"Public Health, northeast corner"},
+  {n:8,  x:46.9, y:41.4, dir:0,   where:"Public Health, north wall"},
+  {n:19, x:43.0, y:40.2, dir:270, where:"Public Health, north side"},
+  {n:18, x:39.1, y:40.2, dir:90,  where:"Public Health, north side"},
+  {n:9,  x:29.4, y:49.1, dir:270, where:"Public Health, by the corridor"},
+  {n:10, x:26.9, y:45.4, dir:270, where:"Public Health, west end"},
+  {n:17, x:24.1, y:41.7, dir:90,  where:"Public Health Warehouse, east wall"},
+  {n:11, x:24.1, y:48.8, dir:180, where:"Public Health Warehouse, southeast corner"},
+  {n:12, x:20.7, y:48.8, dir:180, where:"Public Health Warehouse, south wall"},
+  {n:16, x:17.7, y:49.5, dir:180, where:"Public Health Warehouse, south wall"},
+  {n:13, x:14.3, y:50.2, dir:180, where:"Public Health Warehouse, south wall"},
+  {n:14, x:15.8, y:40.3, dir:0,   where:"Public Health Warehouse, north wall"},
+  {n:15, x:12.4, y:40.3, dir:0,   where:"Public Health Warehouse, north wall"}
+].map(c=>Object.assign(c,{map:"v3", img:"Photos/cameras/cam-"+c.n+".jpg"}));
+const CAM_ORDER = CAMS.slice().sort((a,b)=>a.n-b.n);
+const CAM_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M3 8.6 15.4 5.2l1.9 6.2L4.9 14.8z" fill="#fff"/><path d="M17.6 8.4l3.4-1v4l-3.1.9"/><path d="M8.2 13.9V19H3.5"/></svg>';
+const COMPASS = d => ["north","northeast","east","southeast","south","southwest","west","northwest"][Math.round(((d%360)+360)%360/45)%8];
+let camOn = null, camClock = null;
+
+function renderCams(){
+  const st = $("#stage");
+  st.querySelectorAll(".cam").forEach(n=>n.remove());
+  CAMS.filter(c=>c.map===view).forEach(c=>{
+    const b = el("button",{className:"cam"+(camOn===c.n?" on":""), title:"Camera "+c.n+" · "+c.where, ariaLabel:"Camera "+c.n+" feed"});
+    b.style.left=c.x+"%"; b.style.top=c.y+"%"; b.style.setProperty("--dir", c.dir+"deg");
+    b.append(el("div",{className:"cone"}), el("div",{className:"cdot",innerHTML:CAM_SVG}), el("div",{className:"cnum",textContent:c.n}));
+    b.addEventListener("click", ()=>{ if(panMoved && !editing){ panMoved=false; return; } openCamFeed(c); });
+    st.append(b);
+  });
+}
+
+/* Camera-switch sound: a mechanical click and a short burst of static, made with Web Audio (no sound file). */
+let camAudio = null;
+function camSound(){
+  try{
+    camAudio = camAudio || new (window.AudioContext||window.webkitAudioContext)();
+    const ac = camAudio; if(ac.state==="suspended") ac.resume();
+    const t = ac.currentTime, out = ac.createGain(); out.gain.value = .55; out.connect(ac.destination);
+    // click: two quick clacks
+    [0, .045].forEach((d,i)=>{
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = "square"; o.frequency.setValueAtTime(i?1400:2200, t+d); o.frequency.exponentialRampToValueAtTime(180, t+d+.03);
+      g.gain.setValueAtTime(.0001, t+d); g.gain.exponentialRampToValueAtTime(.5, t+d+.002); g.gain.exponentialRampToValueAtTime(.0001, t+d+.04);
+      o.connect(g).connect(out); o.start(t+d); o.stop(t+d+.05);
+    });
+    // static: band-passed noise that crackles and fades
+    const len = .42, buf = ac.createBuffer(1, Math.ceil(ac.sampleRate*len), ac.sampleRate), ch = buf.getChannelData(0);
+    for(let i=0;i<ch.length;i++){ const crackle = Math.random()<.004 ? 3 : 1; ch[i] = (Math.random()*2-1)*crackle; }
+    const n = ac.createBufferSource(); n.buffer = buf;
+    const bp = ac.createBiquadFilter(); bp.type="bandpass"; bp.frequency.setValueAtTime(3200, t+.05); bp.frequency.exponentialRampToValueAtTime(1200, t+.05+len); bp.Q.value=.7;
+    const hp = ac.createBiquadFilter(); hp.type="highpass"; hp.frequency.value = 400;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(.0001, t+.04); g.gain.exponentialRampToValueAtTime(.35, t+.06);
+    g.gain.setValueAtTime(.3, t+.16); g.gain.exponentialRampToValueAtTime(.0001, t+.04+len);
+    n.connect(bp).connect(hp).connect(g).connect(out); n.start(t+.04); n.stop(t+.04+len);
+  }catch(e){}
+}
+function openCamFeed(c){
+  camSound();
+  camOn = c.n; renderCams();
+  const pad = n => String(n).padStart(2,"0");
+  const clock = el("div",{className:"osd tr"});
+  const tick = ()=>{ const d=new Date(); clock.textContent = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}  ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+  tick(); clearInterval(camClock); camClock = setInterval(()=>{ if(!document.body.contains(clock)){ clearInterval(camClock); return; } tick(); }, 1000);
+  const screen = el("div",{className:"screen"},
+    el("img",{src:c.img, alt:"Camera "+c.n+" view: "+c.where}),
+    el("div",{className:"static"}),
+    el("div",{className:"osd tl",innerHTML:'<span class="r">●</span> REC &nbsp;CAM '+pad(c.n)}),
+    clock,
+    el("div",{className:"osd bl",textContent:"F1 WORKSHOP · BLDG V3 · FACING "+COMPASS(c.dir).toUpperCase()}));
+  const i = CAM_ORDER.indexOf(c);
+  const prev = el("button",{className:"btn",textContent:"◀ Cam "+CAM_ORDER[(i+CAM_ORDER.length-1)%CAM_ORDER.length].n});
+  const next = el("button",{className:"btn",textContent:"Cam "+CAM_ORDER[(i+1)%CAM_ORDER.length].n+" ▶"});
+  prev.onclick=()=>openCamFeed(CAM_ORDER[(i+CAM_ORDER.length-1)%CAM_ORDER.length]);
+  next.onclick=()=>openCamFeed(CAM_ORDER[(i+1)%CAM_ORDER.length]);
+  const close = el("button",{className:"btn gold",textContent:"Close"}); close.onclick=closeSheet;
+  const bar = el("div",{className:"bar"}, el("div",{className:"t",innerHTML:"Camera "+c.n+"<small>"+esc(c.where)+" · looking "+COMPASS(c.dir)+"</small>"}), prev, next, close);
+  openSheet(el("div",{className:"feed"}, screen, bar));
+  requestAnimationFrame(()=>screen.classList.add("switching"));
 }
 
 function attachBubbleEvents(b, r){
@@ -507,7 +632,7 @@ function focusOn(rs){
    DETAIL / EDITOR SHEETS
    ========================================================= */
 function openSheet(node){ const s=$("#sheet"); s.innerHTML=""; s.append(node); $("#scrim").classList.add("open"); }
-function closeSheet(){ $("#scrim").classList.remove("open"); }
+function closeSheet(){ $("#scrim").classList.remove("open"); if(camOn!==null){ camOn=null; renderCams(); } }
 $("#scrim").addEventListener("click", e=>{ if(e.target.id==="scrim") closeSheet(); });
 
 function openDetail(r){
