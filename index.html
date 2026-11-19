@@ -90,6 +90,7 @@ body.editing .bubble .dot{border-style:dashed;cursor:grab}
 .mic{width:84px;height:84px;border-radius:50%;background:var(--gold);color:var(--navy);display:grid;place-items:center;flex:none;box-shadow:0 8px 20px rgba(255,199,44,.3)}
 .mic svg{width:38px;height:38px}
 .mic.live{background:#E5484D;color:#fff;animation:pulse 1.2s infinite}
+#micStatus{font-weight:600}
 .send{width:56px;height:56px;border-radius:14px;background:var(--navy-3);display:grid;place-items:center;flex:none}
 .voice-row{display:flex;justify-content:space-between;align-items:center;padding:0 20px 8px;color:var(--muted);font-size:14px}
 .toggle{display:inline-flex;align-items:center;gap:8px}
@@ -1020,25 +1021,123 @@ const voiceSw = $("#voiceSw");
 voiceSw.classList.toggle("on", settings.speak);
 voiceSw.onclick=()=>{ settings.speak=!settings.speak; voiceSw.classList.toggle("on",settings.speak); if(!settings.speak) stopSpeaking(); saveSettings(); };
 
-/* ---- Speech to text ---- */
+/* ---- Speech to text ----
+   Records from the microphone and transcribes it with Whisper running
+   inside the page (transformers.js). No Google/Microsoft speech service needed.
+   The model (~40 MB) downloads once from the internet, then the browser caches it.
+   If the model can't load, falls back to the browser's built-in recognition. */
+const micBtn=$("#micBtn"), micStatus=$("#micStatus");
+const setMicStatus=t=>{ micStatus.textContent=t||""; };
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec=null, listening=false, finalText="";
-if(SR){
-  rec = new SR(); rec.lang="en-US"; rec.interimResults=true; rec.continuous=false;
-  rec.onresult = e=>{
-    let interim=""; finalText="";
-    for(const r of e.results){ (r.isFinal ? (finalText+=r[0].transcript) : (interim+=r[0].transcript)); }
-    $("#textIn").value = finalText || interim;
-  };
-  rec.onend = ()=>{ listening=false; $("#micBtn").classList.remove("live"); $("#micStatus").textContent=""; const t=finalText || $("#textIn").value; finalText=""; if(t) sendText(t); };
-  rec.onerror = e=>{ $("#micStatus").textContent = e.error==="not-allowed" ? "Microphone blocked" : ""; };
+let stt={state:"idle"};                  // idle | recording | transcribing
+let asr=null, asrLoading=null, asrFailed=false;
+
+function loadASR(){
+  if(asr) return Promise.resolve(asr);
+  if(asrLoading) return asrLoading;
+  asrLoading=(async()=>{
+    const {pipeline, env} = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3");
+    env.allowLocalModels=false;
+    const files={};
+    asr = await pipeline("automatic-speech-recognition","Xenova/whisper-tiny.en",{
+      progress_callback:p=>{
+        if(p.status!=="progress" || !p.total) return;
+        files[p.file]=[p.loaded,p.total];
+        const v=Object.values(files), pct=Math.round(100*v.reduce((a,x)=>a+x[0],0)/v.reduce((a,x)=>a+x[1],0));
+        if(stt.state!=="recording") setMicStatus(`Loading voice model… ${pct}%`);
+      }
+    });
+    if(stt.state==="idle") setMicStatus("");
+    return asr;
+  })().catch(e=>{ asrLoading=null; asrFailed=true; console.warn("Voice model failed to load:",e); if(stt.state==="idle") setMicStatus(""); throw e; });
+  return asrLoading;
 }
-$("#micBtn").onclick=()=>{
-  if(!rec){ toast("Voice input needs Chrome or Edge"); $("#textIn").focus(); return; }
-  if(listening){ rec.stop(); return; }
-  stopSpeaking(); finalText=""; $("#textIn").value="";
-  try{ rec.start(); listening=true; $("#micBtn").classList.add("live"); $("#micStatus").textContent="Listening…"; }catch(e){}
+
+function micErrMsg(e){
+  return e && e.name==="NotFoundError"    ? "No microphone found. Plug one in or pick it in Windows sound settings."
+       : e && e.name==="NotReadableError" ? "The microphone is being used by another app. Close it and try again."
+       : !window.isSecureContext          ? "Microphone needs the page opened from a file or https:// address."
+       : "Microphone blocked. Click the 🔒 / 🎤 icon in the address bar and choose Allow.";
+}
+function setIdle(msg){ stt={state:"idle"}; micBtn.classList.remove("live"); micBtn.style.boxShadow=""; micBtn.setAttribute("aria-label","Talk"); setMicStatus(msg); }
+
+async function startRecording(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder){ toast("This browser can't use the microphone. Use Chrome or Edge."); return; }
+  let stream;
+  try{ stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}}); }
+  catch(e){ console.warn("getUserMedia:",e); toast(micErrMsg(e)); setMicStatus("Mic unavailable"); return; }
+
+  const ctx = new (window.AudioContext||window.webkitAudioContext)();
+  const an = ctx.createAnalyser(); an.fftSize=1024; ctx.createMediaStreamSource(stream).connect(an);
+  const buf = new Float32Array(an.fftSize);
+  const mr = new MediaRecorder(stream), chunks=[];
+  mr.ondataavailable = e=>{ if(e.data.size) chunks.push(e.data); };
+
+  const s = stt = {state:"recording", stream, ctx, mr, heard:false};
+  micBtn.classList.add("live"); micBtn.setAttribute("aria-label","Stop listening");
+  setMicStatus("Listening… speak now");
+
+  const t0=performance.now(); let noise=0, frames=0, lastLoud=t0;
+  s.timer = setInterval(()=>{
+    an.getFloatTimeDomainData(buf);
+    let sum=0; for(const x of buf) sum+=x*x; const rms=Math.sqrt(sum/buf.length);
+    if(frames<6){ noise+=rms/6; frames++; }                          // first ~300 ms = background level
+    const thr=Math.max(0.012, noise*2.5), now=performance.now();
+    if(rms>thr){ lastLoud=now; if(!s.heard){ s.heard=true; setMicStatus("Listening…"); } }
+    micBtn.style.boxShadow=`0 0 0 ${Math.min(30,rms*400)}px rgba(229,72,77,.35)`;   // live level meter
+    if((s.heard && now-lastLoud>1500) || (!s.heard && now-t0>7000) || now-t0>20000) stopRecording();
+  },50);
+
+  mr.onstop = ()=>{
+    clearInterval(s.timer); stream.getTracks().forEach(t=>t.stop()); ctx.close().catch(()=>{});
+    if(!s.heard){ setIdle("Didn't hear anything. Tap the mic and try again."); return; }
+    transcribe(new Blob(chunks,{type:mr.mimeType||"audio/webm"}));
+  };
+  mr.start(250);
+  loadASR().catch(()=>{});               // make sure the model is on its way
+}
+function stopRecording(){ if(stt.state==="recording" && stt.mr.state!=="inactive") stt.mr.stop(); }
+
+async function transcribe(blob){
+  stt={state:"transcribing"}; micBtn.classList.remove("live"); micBtn.style.boxShadow="";
+  setMicStatus("Thinking…");
+  try{
+    const dc = new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000});
+    const audio = await dc.decodeAudioData(await blob.arrayBuffer()); dc.close().catch(()=>{});
+    const model = await loadASR();
+    setMicStatus("Transcribing…");
+    const out = await model(audio.getChannelData(0));
+    const text = (out.text||"").replace(/\[[^\]]*\]|\([^)]*\)/g,"").replace(/\s+/g," ").trim();
+    setIdle("");
+    if(!text || /^[.\s]*$/.test(text)){ setMicStatus("Couldn't make that out. Try again."); return; }
+    $("#textIn").value=text; sendText(text);
+  }catch(e){
+    console.warn("Transcription failed:",e);
+    setIdle("Voice input failed");
+    toast(SR ? "Voice model couldn't load. Tap the mic again to use the browser's voice input." : "Voice model couldn't load. Check the internet connection.");
+  }
+}
+
+/* Fallback: the browser's built-in recognition (Chrome/Edge, needs internet) */
+function startBrowserSR(){
+  const rec=new SR(); rec.lang="en-US"; rec.interimResults=true; rec.continuous=false;
+  let text="";
+  rec.onstart=()=>{ stt={state:"recording",rec}; micBtn.classList.add("live"); setMicStatus("Listening… speak now"); };
+  rec.onresult=e=>{ text=[...e.results].map(r=>r[0].transcript).join(""); $("#textIn").value=text; };
+  rec.onerror=e=>{ console.warn("SpeechRecognition:",e.error); if(e.error!=="aborted"&&e.error!=="no-speech") toast("Voice input error: "+e.error); };
+  rec.onend=()=>{ setIdle(""); if(text.trim()) sendText(text.trim()); };
+  try{ rec.start(); }catch(e){ setIdle("Voice input failed"); }
+}
+
+micBtn.onclick = ()=>{
+  if(stt.state==="recording"){ stt.rec ? stt.rec.stop() : stopRecording(); return; }
+  if(stt.state==="transcribing") return;
+  stopSpeaking(); $("#textIn").value="";
+  if(asrFailed && SR){ asrFailed=false; startBrowserSR(); return; }
+  startRecording();
 };
+setTimeout(()=>loadASR().catch(()=>{}), 1500);   // pre-download the voice model at startup
+
 $("#sendBtn").onclick=()=>sendText($("#textIn").value);
 $("#textIn").addEventListener("keydown",e=>{ if(e.key==="Enter") sendText($("#textIn").value); });
 
